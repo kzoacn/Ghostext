@@ -78,7 +78,8 @@ HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 d
 1. `crypto layer`
    - 把用户明文变成加密后的二进制 packet
 2. `model backend`
-   - 对本地模型做推理并提取 logits / logprobs
+   - 当前代码用一个确定性的双语 toy backend 做端到端验证
+   - 后续可替换为真实本地模型推理与 logits / logprobs 提取
 3. `candidate policy`
    - 决定哪些 token 可参与编码
 4. `quantization layer`
@@ -433,6 +434,7 @@ src/hidetext/
   candidate_policy.py
   quantization.py
   codec.py
+  pipeline.py
   encoder.py
   decoder.py
   cli.py
@@ -443,6 +445,8 @@ tests/
   test_codec_toy.py
   test_roundtrip_zh.py
   test_roundtrip_en.py
+  test_failures.py
+  test_cli.py
 ```
 
 ## 21. MVP 里程碑

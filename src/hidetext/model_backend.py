@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import math
+from typing import Protocol
 
 from .errors import ModelBackendError
 
@@ -44,6 +45,21 @@ def _char_class(ch: str) -> str:
     if ch.isdigit():
         return "digit"
     return "punct"
+
+
+class TextBackend(Protocol):
+    @property
+    def metadata(self) -> BackendMetadata:
+        ...
+
+    def tokenize(self, text: str, prompt: str) -> list[str]:
+        ...
+
+    def render(self, tokens: list[str]) -> str:
+        ...
+
+    def distribution(self, prompt: str, generated_tokens: list[str], seed: int) -> list[TokenProb]:
+        ...
 
 
 class ToyCharBackend:
@@ -131,4 +147,3 @@ class ToyCharBackend:
             TokenProb(token=ch, token_id=token_id, probability=prob)
             for token_id, (ch, prob) in enumerate(zip(vocab, probs, strict=True))
         ]
-
