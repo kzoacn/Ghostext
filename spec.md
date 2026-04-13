@@ -161,10 +161,10 @@ HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 d
 
 第一版建议使用显式长度头，以便接收端知道何时停止。
 
-建议的 packet 结构：
+当前实现采用固定长度头部，结构如下：
 
 ```text
-magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | nonce_len[1] | ct_len[4] | nonce[...] | ciphertext[...] | tag[16]
+magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_len[1] | ct_len[4] | config_fingerprint[8] | salt[...] | nonce[...] | ciphertext_and_tag[ct_len]
 ```
 
 说明：
@@ -174,18 +174,25 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | nonce_len[1] | ct_le
 - `flags`：保留位
 - `kdf_id`：密钥派生算法编号
 - `aead_id`：AEAD 算法编号
+- `salt_len`：KDF salt 长度
 - `nonce_len`：nonce 长度
-- `ct_len`：密文长度
+- `ct_len`：`ciphertext || tag` 的总长度
+- `config_fingerprint`：运行时协议配置、模型元数据与 prompt 的 64-bit 指纹
+- `salt`：KDF salt
 - `nonce`：AEAD nonce
-- `ciphertext`：加密后的消息
-- `tag`：认证标签
+- `ciphertext_and_tag`：AEAD 输出
 
 第一版可选的默认密码学配置：
 
 - `KDF`: `scrypt` 或 `Argon2id`
 - `AEAD`: `ChaCha20-Poly1305` 或 `AES-256-GCM`
 
-实现时只需固定一种默认组合即可，不要求一开始就支持多算法。
+当前实现固定默认组合：
+
+- `KDF`: `scrypt`
+- `AEAD`: `ChaCha20-Poly1305`
+
+`header` 本身作为 AEAD 的 associated data 参与认证。
 
 ## 12. Cover Text 与 Prompt
 
@@ -286,24 +293,37 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | nonce_len[1] | ct_le
 - 固定 bit 输出/消费顺序
 - 固定结束条件
 
+当前 MVP 实现使用的是一个更直接的 `finite-message interval codec`：
+
+- 对一个长度为 `n` 字节的 segment，把消息看成区间 `0..2^(8n)-1` 上的一个整数点
+- 每一步根据量化后的候选分布，把当前整数区间按 CDF 划分为若干子区间
+- 发送端选择包含目标整数点的那个 token
+- 接收端观察 token 后，用同样的子区间规则收缩区间
+- 当区间宽度收缩到 `1` 时，该 segment 被唯一恢复
+
+这个实现仍然完全使用整数算术，但不依赖固定宽度 renormalization；它更适合作为工程 demo 的首版可验证原型。
+
 ### 15.2 发送端与接收端的对偶关系
 
-建议按以下对偶关系实现：
+当前实现按以下对偶关系工作：
 
-- 发送端：把 `stego packet` bitstream 作为输入，驱动一个“按 token 分布解码”的 range decoder，从而依次选出 token。
-- 接收端：观察到 token 序列后，在同样的分布序列上运行镜像 range encoder，把 packet bitstream 重新编码出来。
+- 发送端：把 segment 字节串映射为一个目标整数，并在每一步按 token 分布收缩区间、选出包含该整数的 token。
+- 接收端：观察到 token 序列后，在相同的分布序列上执行镜像区间收缩，直到区间宽度为 `1`，再恢复对应字节串。
 
 这两个过程必须使用同一个 codec 规范。
 
 ### 15.3 终止条件
 
-第一版建议采用 `显式长度头 + 完整恢复即停止` 策略：
+当前实现采用 `固定头 segment + 显式长度体 segment` 的两阶段停止策略：
 
-- packet 头中包含总密文长度
-- 接收端一旦恢复出完整 packet，即可停止
-- 发送端应能判断“当前已生成文本足以让接收端恢复完整 packet”
+- 先把固定长度 packet 头编码为第一个 segment
+- 接收端在头 segment 区间宽度变为 `1` 后即可恢复 header
+- header 中给出 `salt_len`、`nonce_len` 和 `ct_len`，从而确定 body segment 的精确长度
+- 再对 body segment 执行同样的区间编码
+- 发送端在两个 segment 都收敛后停止生成
+- 接收端在 body segment 完整恢复后停止解码
 
-实现上，发送端可以维护一个镜像 encoder，用来检查目前已生成 token 所对应的可恢复 bit 长度是否足够。
+这样可以避免在 packet 总长度未知时直接对整包做一次性编码。
 
 ## 16. 推荐默认参数
 

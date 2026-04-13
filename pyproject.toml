@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hidetext"
+version = "0.1.0"
+description = "Deterministic text steganography demo driven by next-token distributions"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "cryptography>=41.0.0",
+]
+
+[project.scripts]
+hidetext = "hidetext.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
