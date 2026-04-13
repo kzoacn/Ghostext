@@ -25,6 +25,7 @@ class MessageSegmentEncoder:
 
     def __post_init__(self) -> None:
         self.length = len(self.payload)
+        self.total_bits = 8 * self.length
         self.domain = 1 if self.length == 0 else 1 << (8 * self.length)
         self.target = int.from_bytes(self.payload, "big") if self.length else 0
         self.low = 0
@@ -33,6 +34,15 @@ class MessageSegmentEncoder:
     @property
     def finished(self) -> bool:
         return self.high - self.low == 1
+
+    @property
+    def resolved_bits(self) -> float:
+        if self.total_bits == 0:
+            return 0.0
+        width = self.high - self.low
+        if width <= 0:
+            raise ValueError("encoder interval collapsed")
+        return max(0.0, min(float(self.total_bits), self.total_bits - math.log2(width)))
 
     def choose(self, distribution: QuantizedDistribution) -> tuple[int, float]:
         width_before = self.high - self.low
@@ -60,6 +70,7 @@ class MessageSegmentDecoder:
     payload_len: int
 
     def __post_init__(self) -> None:
+        self.total_bits = 8 * self.payload_len
         self.domain = 1 if self.payload_len == 0 else 1 << (8 * self.payload_len)
         self.low = 0
         self.high = self.domain
@@ -67,6 +78,15 @@ class MessageSegmentDecoder:
     @property
     def finished(self) -> bool:
         return self.high - self.low == 1
+
+    @property
+    def resolved_bits(self) -> float:
+        if self.total_bits == 0:
+            return 0.0
+        width = self.high - self.low
+        if width <= 0:
+            raise ValueError("decoder interval collapsed")
+        return max(0.0, min(float(self.total_bits), self.total_bits - math.log2(width)))
 
     def absorb(self, distribution: QuantizedDistribution, index: int) -> None:
         entry = distribution.entries[index]
@@ -86,4 +106,3 @@ class MessageSegmentDecoder:
         if self.payload_len == 0:
             return b""
         return self.low.to_bytes(self.payload_len, "big")
-

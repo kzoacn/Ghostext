@@ -11,10 +11,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class CliTests(unittest.TestCase):
-    def _run(self, *args: str) -> dict[str, object]:
+    def _run_completed(self, *args: str) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env["PYTHONPATH"] = str(REPO_ROOT / "src")
-        completed = subprocess.run(
+        return subprocess.run(
             [sys.executable, "-m", "hidetext.cli", *args],
             cwd=REPO_ROOT,
             env=env,
@@ -22,6 +22,9 @@ class CliTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def _run(self, *args: str) -> dict[str, object]:
+        completed = self._run_completed(*args)
         return json.loads(completed.stdout)
 
     def test_encode_then_decode(self) -> None:
@@ -91,6 +94,28 @@ class CliTests(unittest.TestCase):
                 str(seed_path),
             )
             self.assertEqual(decoded["plaintext"], message)
+
+    def test_eval_progress_goes_to_stderr(self) -> None:
+        completed = self._run_completed(
+            "eval",
+            "--prompt",
+            "请写一段温柔自然的中文短文。",
+            "--passphrase",
+            "progress-pass",
+            "--message",
+            "进度日志可见",
+            "--seed",
+            "13",
+            "--show-progress",
+            "--progress-token-interval",
+            "400",
+        )
+        payload = json.loads(completed.stdout)
+        self.assertTrue(payload["roundtrip_ok"])
+        self.assertIn("[encode][header]", completed.stderr)
+        self.assertIn("bits=", completed.stderr)
+        self.assertIn("tps=", completed.stderr)
+        self.assertIn("bpt=", completed.stderr)
 
 
 if __name__ == "__main__":

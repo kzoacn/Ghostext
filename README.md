@@ -98,6 +98,25 @@ PYTHONPATH=src python3 -m hidetext.cli eval \
   `--top-p`、`--max-candidates`、`--min-entropy-bits`、`--totfreq`、
   `--header-token-budget`、`--body-token-budget`
 
+如果你希望在运行过程中看到调试进度，可以加：
+
+```bash
+PYTHONPATH=src python3 -m hidetext.cli eval \
+  --show-progress \
+  --progress-token-interval 200 \
+  --prompt '请写一段温柔自然的中文短文。' \
+  --passphrase pass-zh \
+  --message '今晚七点在老地方见。' \
+  --seed 17
+```
+
+进度日志会写到 `stderr`，不会污染最终的 JSON。当前会显示：
+
+- `bits=已解析bit/总bit`
+- `segment_bits=当前 segment 已解析bit/segment 总bit`
+- `tps=tokens per second`
+- `bpt=当前已解析 bits per token`
+
 如果你想分别编码和解码：
 
 ```bash

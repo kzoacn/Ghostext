@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
 from .config import RuntimeConfig
 from .decoder import StegoDecoder
 from .encoder import StegoEncoder
 from .model_backend import ToyCharBackend
+from .progress import ProgressSnapshot
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -42,6 +44,8 @@ def _build_parser() -> argparse.ArgumentParser:
         subparser.add_argument("--totfreq", type=int, default=65536)
         subparser.add_argument("--header-token-budget", type=int, default=1024)
         subparser.add_argument("--body-token-budget", type=int, default=4096)
+        subparser.add_argument("--show-progress", action="store_true")
+        subparser.add_argument("--progress-token-interval", type=int, default=50)
 
     encode_parser = subparsers.choices["encode"]
     encode_parser.add_argument("--message", required=True)
@@ -128,6 +132,49 @@ def _build_backend(args: argparse.Namespace, *, seed: int):
     raise ValueError(f"unsupported backend: {args.backend}")
 
 
+def _build_progress_reporter(args: argparse.Namespace):
+    if not args.show_progress:
+        return None
+
+    interval = max(1, args.progress_token_interval)
+    state = {"last_total_tokens": -1, "last_segment": None}
+
+    def report(snapshot: ProgressSnapshot) -> None:
+        segment_changed = snapshot.segment_name != state["last_segment"]
+        should_print = snapshot.finished or segment_changed
+        if state["last_total_tokens"] < 0:
+            should_print = True
+        elif snapshot.total_tokens - state["last_total_tokens"] >= interval:
+            should_print = True
+        if not should_print:
+            return
+
+        state["last_total_tokens"] = snapshot.total_tokens
+        state["last_segment"] = snapshot.segment_name
+        overall_total = (
+            "?"
+            if snapshot.overall_bits_total is None
+            else str(snapshot.overall_bits_total)
+        )
+        status = "done" if snapshot.finished else "running"
+        print(
+            (
+                f"[{snapshot.phase}][{snapshot.segment_name}][{status}] "
+                f"bits={snapshot.overall_bits_done:.1f}/{overall_total} "
+                f"segment_bits={snapshot.segment_bits_done:.1f}/{snapshot.segment_bits_total} "
+                f"tokens={snapshot.total_tokens} "
+                f"segment_tokens={snapshot.segment_tokens}/{snapshot.token_budget} "
+                f"tps={snapshot.tokens_per_second:.2f} "
+                f"bpt={snapshot.bits_per_token:.3f} "
+                f"elapsed={snapshot.elapsed_seconds:.1f}s"
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+
+    return report
+
+
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -143,12 +190,14 @@ def main() -> None:
         backend = _build_backend(args, seed=seed)
     except ValueError as exc:
         parser.error(str(exc))
+    progress_reporter = _build_progress_reporter(args)
 
     if args.command == "encode":
         result = StegoEncoder(backend, config).encode(
             args.message,
             passphrase=passphrase,
             prompt=prompt,
+            progress_callback=progress_reporter,
         )
         print(
             json.dumps(
@@ -158,6 +207,8 @@ def main() -> None:
                     "config_fingerprint": f"{result.config_fingerprint:016x}",
                     "packet_len": len(result.packet),
                     "total_tokens": result.total_tokens,
+                    "elapsed_seconds": round(result.elapsed_seconds, 4),
+                    "tokens_per_second": round(result.tokens_per_second, 4),
                     "bits_per_token": round(result.bits_per_token, 4),
                     "segments": [
                         {
@@ -180,6 +231,7 @@ def main() -> None:
             args.text,
             passphrase=passphrase,
             prompt=prompt,
+            progress_callback=progress_reporter,
         )
         print(
             json.dumps(
@@ -188,6 +240,9 @@ def main() -> None:
                     "backend": args.backend,
                     "consumed_tokens": result.consumed_tokens,
                     "packet_len": len(result.packet),
+                    "elapsed_seconds": round(result.elapsed_seconds, 4),
+                    "tokens_per_second": round(result.tokens_per_second, 4),
+                    "bits_per_token": round(result.bits_per_token, 4),
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -198,8 +253,18 @@ def main() -> None:
     if args.command == "eval":
         encoder = StegoEncoder(backend, config)
         decoder = StegoDecoder(backend, config)
-        encoded = encoder.encode(args.message, passphrase=passphrase, prompt=prompt)
-        decoded = decoder.decode(encoded.text, passphrase=passphrase, prompt=prompt)
+        encoded = encoder.encode(
+            args.message,
+            passphrase=passphrase,
+            prompt=prompt,
+            progress_callback=progress_reporter,
+        )
+        decoded = decoder.decode(
+            encoded.text,
+            passphrase=passphrase,
+            prompt=prompt,
+            progress_callback=progress_reporter,
+        )
         print(
             json.dumps(
                 {
@@ -208,6 +273,10 @@ def main() -> None:
                     "text": encoded.text,
                     "packet_len": len(encoded.packet),
                     "total_tokens": encoded.total_tokens,
+                    "encode_elapsed_seconds": round(encoded.elapsed_seconds, 4),
+                    "decode_elapsed_seconds": round(decoded.elapsed_seconds, 4),
+                    "encode_tokens_per_second": round(encoded.tokens_per_second, 4),
+                    "decode_tokens_per_second": round(decoded.tokens_per_second, 4),
                     "bits_per_token": round(encoded.bits_per_token, 4),
                 },
                 ensure_ascii=False,
