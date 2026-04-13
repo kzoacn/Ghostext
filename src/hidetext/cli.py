@@ -44,6 +44,7 @@ def _build_parser() -> argparse.ArgumentParser:
         subparser.add_argument("--totfreq", type=int, default=65536)
         subparser.add_argument("--header-token-budget", type=int, default=1024)
         subparser.add_argument("--body-token-budget", type=int, default=4096)
+        subparser.add_argument("--stall-patience-tokens", type=int, default=256)
         subparser.add_argument("--show-progress", action="store_true")
         subparser.add_argument("--progress-token-interval", type=int, default=50)
 
@@ -108,6 +109,7 @@ def _config_from_args(args: argparse.Namespace, *, seed: int) -> RuntimeConfig:
             total_frequency=args.totfreq,
             max_header_tokens=args.header_token_budget,
             max_body_tokens=args.body_token_budget,
+            stall_patience_tokens=args.stall_patience_tokens,
         ),
     )
 

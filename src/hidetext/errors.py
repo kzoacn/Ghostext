@@ -26,6 +26,9 @@ class EncodingExhaustedError(HideTextError):
     """Raised when encoding cannot finish within the configured token budget."""
 
 
+class StallDetectedError(HideTextError):
+    """Raised when encoding stops making forward bit progress for too long."""
+
+
 class ModelBackendError(HideTextError):
     """Raised when the backend cannot provide or parse tokens."""
-

@@ -331,6 +331,13 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_
 
 这样可以避免在 packet 总长度未知时直接对整包做一次性编码。
 
+另外，当前实现加入了 `stall detector`：
+
+- 如果发送端在某个 segment 上连续很多步都没有任何 bit 进展
+- 就应当显式失败，而不是继续空跑到 token budget
+- `stall_patience_tokens` 是发送端本地运行时安全参数，不进入 packet 指纹
+- 这样可以更早发现真实模型掉进低熵循环或候选集坍缩
+
 ## 16. 推荐默认参数
 
 这些参数是建议值，不是强制常数：
@@ -362,6 +369,7 @@ range_precision_bits = 64
 7. 区间编码 renormalization 不一致
 8. 输出文本被额外改动
 9. 解码得到的 packet 无法通过 AEAD 校验
+10. 真实模型进入长时间零容量 stall
 
 默认处理方式：
 

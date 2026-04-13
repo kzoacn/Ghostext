@@ -35,6 +35,7 @@ class LlamaCppIntegrationTests(unittest.TestCase):
                 total_frequency=4096,
                 max_header_tokens=1024,
                 max_body_tokens=3072,
+                stall_patience_tokens=0,
             ),
         )
         prompt = "请写一段自然、简短、连贯的中文段落，描写傍晚散步时看到的街景。"

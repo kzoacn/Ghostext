@@ -71,6 +71,7 @@ PYTHONPATH=src python3 -m hidetext.cli eval \
   --totfreq 4096 \
   --header-token-budget 1024 \
   --body-token-budget 4096 \
+  --stall-patience-tokens 256 \
   --prompt '请写一段自然、简短、连贯的中文段落，描写傍晚散步时看到的街景。' \
   --passphrase qwen-real-test \
   --message '真实模型联调成功' \
@@ -96,7 +97,10 @@ PYTHONPATH=src python3 -m hidetext.cli eval \
 - 真实模型后端还支持 `--backend llama-cpp --model-path ...`
 - 候选策略和 codec 关键参数可以直接通过 CLI 调整：
   `--top-p`、`--max-candidates`、`--min-entropy-bits`、`--totfreq`、
-  `--header-token-budget`、`--body-token-budget`
+  `--header-token-budget`、`--body-token-budget`、`--stall-patience-tokens`
+- 如果编码过程中连续很多步完全没有 bit 增长，默认会在 `256` 步后 fail closed，而不是继续空跑到 token budget
+- `--stall-patience-tokens` 只影响发送端的本地安全策略，不会进入 packet fingerprint
+- 传 `--stall-patience-tokens 0` 可以显式关闭这个 detector
 
 如果你希望在运行过程中看到调试进度，可以加：
 
@@ -116,6 +120,14 @@ PYTHONPATH=src python3 -m hidetext.cli eval \
 - `segment_bits=当前 segment 已解析bit/segment 总bit`
 - `tps=tokens per second`
 - `bpt=当前已解析 bits per token`
+
+如果你想更早发现真实模型进入“低熵死循环”，可以把：
+
+```bash
+--stall-patience-tokens 64
+```
+
+调得更小。
 
 如果你想分别编码和解码：
 

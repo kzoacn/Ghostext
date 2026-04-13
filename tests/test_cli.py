@@ -117,6 +117,22 @@ class CliTests(unittest.TestCase):
         self.assertIn("tps=", completed.stderr)
         self.assertIn("bpt=", completed.stderr)
 
+    def test_stall_patience_argument_is_accepted(self) -> None:
+        payload = self._run(
+            "encode",
+            "--prompt",
+            "Write a calm and readable English paragraph.",
+            "--passphrase",
+            "cli-pass",
+            "--message",
+            "CLI roundtrip works.",
+            "--seed",
+            "11",
+            "--stall-patience-tokens",
+            "64",
+        )
+        self.assertIn("text", payload)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -30,6 +30,7 @@ class CodecConfig:
     total_frequency: int = 65536
     max_header_tokens: int = 1024
     max_body_tokens: int = 4096
+    stall_patience_tokens: int = 256
 
     def as_protocol_dict(self) -> dict[str, object]:
         return {
@@ -90,4 +91,3 @@ class RuntimeConfig:
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True, indent=2)
-

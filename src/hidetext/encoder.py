@@ -6,11 +6,13 @@ from time import perf_counter
 from .codec import MessageSegmentEncoder
 from .config import RuntimeConfig
 from .crypto import build_packet
-from .errors import EncodingExhaustedError
+from .errors import EncodingExhaustedError, StallDetectedError
 from .model_backend import TextBackend
 from .packet import HEADER_SIZE
 from .pipeline import prepare_quantized_distribution
 from .progress import ProgressCallback, ProgressSnapshot
+
+STALL_PROGRESS_EPSILON_BITS = 1e-9
 
 
 @dataclass(frozen=True)
@@ -135,6 +137,8 @@ class StegoEncoder:
         steps = 0
         encoding_steps = 0
         embedded_bits = 0.0
+        previous_resolved_bits = encoder.resolved_bits
+        stall_run = 0
         while not encoder.finished:
             if steps >= max_tokens:
                 raise EncodingExhaustedError(
@@ -155,6 +159,20 @@ class StegoEncoder:
                 chosen_token_id = quantized.top.token_id
             generated_token_ids.append(chosen_token_id)
             steps += 1
+            current_resolved_bits = encoder.resolved_bits
+            if current_resolved_bits <= previous_resolved_bits + STALL_PROGRESS_EPSILON_BITS:
+                stall_run += 1
+            else:
+                stall_run = 0
+            if (
+                self.config.codec.stall_patience_tokens > 0
+                and stall_run >= self.config.codec.stall_patience_tokens
+            ):
+                raise StallDetectedError(
+                    f"{segment_name} segment stalled for {stall_run} consecutive tokens "
+                    f"at {current_resolved_bits:.3f}/{encoder.total_bits} bits"
+                )
+            previous_resolved_bits = current_resolved_bits
             self._emit_progress(
                 segment_name=segment_name,
                 encoder=encoder,
