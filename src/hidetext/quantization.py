@@ -27,11 +27,11 @@ class QuantizedDistribution:
     def top(self) -> QuantizedEntry:
         return self.entries[0]
 
-    def find_index(self, token: str) -> int:
+    def find_token_id_index(self, token_id: int) -> int:
         for index, entry in enumerate(self.entries):
-            if entry.token == token:
+            if entry.token_id == token_id:
                 return index
-        raise KeyError(token)
+        raise KeyError(token_id)
 
 
 def _quantize_probabilities(tokens: tuple[TokenProb, ...], total_frequency: int) -> list[int]:
@@ -84,4 +84,3 @@ def quantize_candidates(
         entropy_bits=selection.entropy_bits,
         allows_encoding=selection.allows_encoding,
     )
-

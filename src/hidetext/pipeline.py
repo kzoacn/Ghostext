@@ -10,9 +10,9 @@ def prepare_quantized_distribution(
     backend: TextBackend,
     *,
     prompt: str,
-    generated_tokens: list[str],
+    generated_token_ids: list[int],
     config: RuntimeConfig,
 ) -> QuantizedDistribution:
-    distribution = backend.distribution(prompt, generated_tokens, config.seed)
-    selection = select_candidates(distribution, config.candidate_policy)
+    distribution = backend.distribution(prompt, generated_token_ids, config.seed)
+    selection = select_candidates(distribution, config.candidate_policy, backend=backend)
     return quantize_candidates(selection, config.codec.total_frequency)

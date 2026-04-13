@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import math
 from typing import Protocol
+import numpy as np
 
 from .errors import ModelBackendError
 
@@ -13,6 +14,12 @@ class TokenProb:
     token: str
     token_id: int
     probability: float
+
+
+@dataclass(frozen=True)
+class RawNextTokenDistribution:
+    token_ids: np.ndarray
+    logits: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -52,13 +59,21 @@ class TextBackend(Protocol):
     def metadata(self) -> BackendMetadata:
         ...
 
-    def tokenize(self, text: str, prompt: str) -> list[str]:
+    def tokenize(self, text: str, prompt: str) -> list[int]:
         ...
 
-    def render(self, tokens: list[str]) -> str:
+    def render(self, token_ids: list[int]) -> str:
         ...
 
-    def distribution(self, prompt: str, generated_tokens: list[str], seed: int) -> list[TokenProb]:
+    def distribution(
+        self,
+        prompt: str,
+        generated_token_ids: list[int],
+        seed: int,
+    ) -> RawNextTokenDistribution:
+        ...
+
+    def token_text(self, token_id: int) -> str:
         ...
 
 
@@ -79,15 +94,11 @@ class ToyCharBackend:
             ),
         }
         self._punctuation = " .,!?;:'\"()-"
-        self._vocab = {
-            language: self._build_vocab(stream)
-            for language, stream in self._streams.items()
-        }
+        self._vocab = self._build_vocab()
+        self._token_to_id = {token: token_id for token_id, token in enumerate(self._vocab)}
         self._metadata = BackendMetadata(
             model_id="toy-char-backend-v1",
-            tokenizer_hash=sha256(
-                "||".join("".join(chars) for chars in self._vocab.values()).encode("utf-8")
-            ).hexdigest(),
+            tokenizer_hash=sha256("".join(self._vocab).encode("utf-8")).hexdigest(),
             backend_id="toy-char",
         )
 
@@ -95,38 +106,44 @@ class ToyCharBackend:
     def metadata(self) -> BackendMetadata:
         return self._metadata
 
-    def _build_vocab(self, stream: str) -> tuple[str, ...]:
-        chars = sorted(set(stream + self._punctuation))
+    def _build_vocab(self) -> tuple[str, ...]:
+        chars = sorted(set("".join(self._streams.values()) + self._punctuation))
         return tuple(chars)
 
     def _language(self, prompt: str) -> str:
         return "zh" if any("\u4e00" <= ch <= "\u9fff" for ch in prompt) else "en"
 
-    def tokenize(self, text: str, prompt: str) -> list[str]:
-        language = self._language(prompt)
-        vocab = set(self._vocab[language])
-        unknown = [ch for ch in text if ch not in vocab]
+    def tokenize(self, text: str, prompt: str) -> list[int]:
+        del prompt
+        unknown = [ch for ch in text if ch not in self._token_to_id]
         if unknown:
             raise ModelBackendError(f"text contains unsupported token(s): {unknown[:5]!r}")
-        return list(text)
+        return [self._token_to_id[ch] for ch in text]
 
-    def render(self, tokens: list[str]) -> str:
-        return "".join(tokens)
+    def render(self, token_ids: list[int]) -> str:
+        return "".join(self._vocab[token_id] for token_id in token_ids)
 
-    def distribution(self, prompt: str, generated_tokens: list[str], seed: int) -> list[TokenProb]:
+    def token_text(self, token_id: int) -> str:
+        return self._vocab[token_id]
+
+    def distribution(
+        self,
+        prompt: str,
+        generated_token_ids: list[int],
+        seed: int,
+    ) -> RawNextTokenDistribution:
         language = self._language(prompt)
         stream = self._streams[language]
-        vocab = self._vocab[language]
-        position = len(generated_tokens) % len(stream)
+        position = len(generated_token_ids) % len(stream)
         expected = stream[position]
         window = {
             stream[(position + offset) % len(stream)]
             for offset in range(-3, 4)
         }
-        context_tail = "".join(generated_tokens[-24:])
+        context_tail = self.render(generated_token_ids[-24:])
 
         logits: list[float] = []
-        for ch in vocab:
+        for ch in self._vocab:
             logit = -4.0
             if ch == expected:
                 logit += 4.1
@@ -138,12 +155,7 @@ class ToyCharBackend:
                 logit += 0.8
             logit += (_stable_fraction(prompt, context_tail, seed, ch) - 0.5) * 0.45
             logits.append(logit)
-
-        max_logit = max(logits)
-        exps = [math.exp(logit - max_logit) for logit in logits]
-        normalizer = sum(exps)
-        probs = [value / normalizer for value in exps]
-        return [
-            TokenProb(token=ch, token_id=token_id, probability=prob)
-            for token_id, (ch, prob) in enumerate(zip(vocab, probs, strict=True))
-        ]
+        return RawNextTokenDistribution(
+            token_ids=np.arange(len(self._vocab), dtype=np.int32),
+            logits=np.asarray(logits, dtype=np.float64),
+        )

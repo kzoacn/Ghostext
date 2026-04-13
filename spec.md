@@ -104,6 +104,11 @@ HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 d
 - 稳定获得全词表 logits
 - 可锁定 tokenizer 与模型版本
 
+当前仓库已经落地了两类 backend：
+
+- `ToyCharBackend`：用于快速、可重复的协议验证
+- `QwenLlamaCppBackend`：用于真实本地模型 CPU 集成测试
+
 ## 8. 默认使用场景
 
 ### 8.1 编码
@@ -431,6 +436,7 @@ src/hidetext/
   packet.py
   crypto.py
   model_backend.py
+  llama_cpp_backend.py
   candidate_policy.py
   quantization.py
   codec.py
@@ -447,6 +453,7 @@ tests/
   test_roundtrip_en.py
   test_failures.py
   test_cli.py
+  test_llama_cpp_integration.py
 ```
 
 ## 21. MVP 里程碑

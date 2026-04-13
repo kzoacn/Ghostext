@@ -16,7 +16,7 @@ class DecodeResult:
     plaintext_bytes: bytes
     plaintext: str
     packet: bytes
-    tokens: tuple[str, ...]
+    token_ids: tuple[int, ...]
     header: PacketHeader
     consumed_tokens: int
 
@@ -27,15 +27,15 @@ class StegoDecoder:
         self.config = config or RuntimeConfig()
 
     def decode(self, stego_text: str, *, passphrase: str, prompt: str) -> DecodeResult:
-        observed_tokens = self.backend.tokenize(stego_text, prompt)
-        consumed_tokens: list[str] = []
+        observed_token_ids = self.backend.tokenize(stego_text, prompt)
+        consumed_token_ids: list[int] = []
         cursor = 0
 
         header_bytes, cursor = self._decode_segment(
             payload_len=HEADER_SIZE,
-            observed_tokens=observed_tokens,
+            observed_token_ids=observed_token_ids,
             cursor=cursor,
-            consumed_tokens=consumed_tokens,
+            consumed_token_ids=consumed_token_ids,
             prompt=prompt,
             max_tokens=self.config.codec.max_header_tokens,
             segment_name="header",
@@ -51,14 +51,14 @@ class StegoDecoder:
         body_len = header.body_len
         body_bytes, cursor = self._decode_segment(
             payload_len=body_len,
-            observed_tokens=observed_tokens,
+            observed_token_ids=observed_token_ids,
             cursor=cursor,
-            consumed_tokens=consumed_tokens,
+            consumed_token_ids=consumed_token_ids,
             prompt=prompt,
             max_tokens=self.config.codec.max_body_tokens,
             segment_name="body",
         )
-        if cursor != len(observed_tokens):
+        if cursor != len(observed_token_ids):
             raise SynchronizationError("stego text contains trailing tokens after packet end")
 
         packet = header_bytes + body_bytes
@@ -72,7 +72,7 @@ class StegoDecoder:
             plaintext_bytes=plaintext_bytes,
             plaintext=plaintext_bytes.decode("utf-8"),
             packet=packet,
-            tokens=tuple(observed_tokens),
+            token_ids=tuple(observed_token_ids),
             header=header,
             consumed_tokens=cursor,
         )
@@ -81,9 +81,9 @@ class StegoDecoder:
         self,
         *,
         payload_len: int,
-        observed_tokens: list[str],
+        observed_token_ids: list[int],
         cursor: int,
-        consumed_tokens: list[str],
+        consumed_token_ids: list[int],
         prompt: str,
         max_tokens: int,
         segment_name: str,
@@ -95,37 +95,38 @@ class StegoDecoder:
                 raise SynchronizationError(
                     f"{segment_name} segment exceeded token budget {max_tokens}"
                 )
-            if cursor >= len(observed_tokens):
+            if cursor >= len(observed_token_ids):
                 raise PacketError(f"stego text ended before {segment_name} segment resolved")
 
             quantized = prepare_quantized_distribution(
                 self.backend,
                 prompt=prompt,
-                generated_tokens=consumed_tokens,
+                generated_token_ids=consumed_token_ids,
                 config=self.config,
             )
-            observed = observed_tokens[cursor]
+            observed_token_id = observed_token_ids[cursor]
+            observed_text = self.backend.token_text(observed_token_id)
 
             if quantized.allows_encoding:
                 try:
-                    index = quantized.find_index(observed)
+                    index = quantized.find_token_id_index(observed_token_id)
                 except KeyError as exc:
                     raise SynchronizationError(
-                        f"observed token {observed!r} not in {segment_name} candidate set"
+                        f"observed token {observed_text!r} not in {segment_name} candidate set"
                     ) from exc
                 try:
                     decoder.absorb(quantized, index)
                 except ValueError as exc:
                     raise SynchronizationError(
-                        f"{segment_name} interval collapsed while absorbing token {observed!r}"
+                        f"{segment_name} interval collapsed while absorbing token {observed_text!r}"
                     ) from exc
             else:
-                if observed != quantized.top.token:
+                if observed_token_id != quantized.top.token_id:
                     raise SynchronizationError(
-                        f"expected deterministic token {quantized.top.token!r}, got {observed!r}"
+                        f"expected deterministic token {quantized.top.token!r}, got {observed_text!r}"
                     )
 
-            consumed_tokens.append(observed)
+            consumed_token_ids.append(observed_token_id)
             cursor += 1
             steps += 1
 
