@@ -44,6 +44,7 @@ def _build_parser() -> argparse.ArgumentParser:
         subparser.add_argument("--totfreq", type=int, default=65536)
         subparser.add_argument("--header-token-budget", type=int, default=1024)
         subparser.add_argument("--body-token-budget", type=int, default=4096)
+        subparser.add_argument("--natural-tail-max-tokens", type=int, default=64)
         subparser.add_argument("--stall-patience-tokens", type=int, default=256)
         subparser.add_argument("--low-entropy-window-tokens", type=int, default=32)
         subparser.add_argument("--low-entropy-threshold-bits", type=float, default=0.1)
@@ -112,6 +113,7 @@ def _config_from_args(args: argparse.Namespace, *, seed: int) -> RuntimeConfig:
             total_frequency=args.totfreq,
             max_header_tokens=args.header_token_budget,
             max_body_tokens=args.body_token_budget,
+            natural_tail_max_tokens=args.natural_tail_max_tokens,
             stall_patience_tokens=args.stall_patience_tokens,
             low_entropy_window_tokens=args.low_entropy_window_tokens,
             low_entropy_threshold_bits=args.low_entropy_threshold_bits,
@@ -215,6 +217,8 @@ def main() -> None:
                     "config_fingerprint": f"{result.config_fingerprint:016x}",
                     "packet_len": len(result.packet),
                     "total_tokens": result.total_tokens,
+                    "packet_tokens": result.packet_tokens,
+                    "tail_tokens": result.tail_tokens,
                     "attempts_used": result.attempts_used,
                     "elapsed_seconds": round(result.elapsed_seconds, 4),
                     "tokens_per_second": round(result.tokens_per_second, 4),
@@ -248,6 +252,7 @@ def main() -> None:
                     "plaintext": result.plaintext,
                     "backend": args.backend,
                     "consumed_tokens": result.consumed_tokens,
+                    "trailing_tokens": result.trailing_tokens,
                     "packet_len": len(result.packet),
                     "elapsed_seconds": round(result.elapsed_seconds, 4),
                     "tokens_per_second": round(result.tokens_per_second, 4),
@@ -282,6 +287,9 @@ def main() -> None:
                     "text": encoded.text,
                     "packet_len": len(encoded.packet),
                     "total_tokens": encoded.total_tokens,
+                    "packet_tokens": encoded.packet_tokens,
+                    "tail_tokens": encoded.tail_tokens,
+                    "decode_trailing_tokens": decoded.trailing_tokens,
                     "attempts_used": encoded.attempts_used,
                     "encode_elapsed_seconds": round(encoded.elapsed_seconds, 4),
                     "decode_elapsed_seconds": round(decoded.elapsed_seconds, 4),

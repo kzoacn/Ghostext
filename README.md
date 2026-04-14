@@ -17,6 +17,7 @@ The project is intentionally optimized for reproducibility and decodability befo
 - CLI commands for `encode`, `decode`, and `eval`
 - fail-closed negative tests for prompt drift, seed drift, text mutation, and retry exhaustion
 - low-entropy monitoring with automatic re-attempts
+- natural tail generation after the secret-bearing prefix is complete
 
 ## Quick start
 
@@ -91,6 +92,17 @@ These knobs are sender-side runtime safety settings and do not enter the packet 
 
 Set `--low-entropy-window-tokens 0` to disable the low-entropy detector for controlled experiments with a fixed packet.
 
+## Natural ending
+
+HideText no longer has to stop exactly at the token where the packet becomes decodable. Once the header and body are fully embedded:
+
+- the secret-bearing prefix is complete and decodable
+- the sender may continue sampling a short random tail for a more natural-looking ending
+- this tail is not part of the codec and is ignored by the decoder
+- decoding stops as soon as the packet is fully recovered, even if more text follows
+
+Use `--natural-tail-max-tokens` to cap how many post-packet tokens may be sampled. Set it to `0` if you want the old stop-immediately behavior.
+
 ## CLI usage
 
 Toy backend round-trip:
@@ -118,6 +130,7 @@ Real Qwen CPU round-trip:
   --totfreq 4096 \
   --header-token-budget 1024 \
   --body-token-budget 4096 \
+  --natural-tail-max-tokens 64 \
   --stall-patience-tokens 256 \
   --low-entropy-window-tokens 32 \
   --low-entropy-threshold-bits 0.1 \
@@ -222,7 +235,8 @@ tests/
 
 - The packet is encoded as `fixed-size header + explicit-length body`.
 - The core codec uses integer interval refinement instead of floating-point comparisons.
-- The decoder fails closed on prompt drift, seed drift, token drift, or config mismatch.
+- The decoder fails closed on prompt drift, seed drift, token drift, or config mismatch inside the secret-bearing prefix.
+- After the packet-bearing prefix resolves, the encoder can append a non-coded natural tail and the decoder ignores it.
 - Retry-on-low-entropy is operational safety logic for the sender, not part of the shared decode fingerprint.
 - The toy backend is the fastest way to validate protocol behavior; the Qwen `llama.cpp` backend is the realistic local CPU path.
 

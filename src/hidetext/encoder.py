@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from hashlib import sha256
+import random
 from time import perf_counter
 
 from .codec import MessageSegmentEncoder
@@ -37,6 +39,14 @@ class EncodeResult:
     @property
     def total_tokens(self) -> int:
         return len(self.token_ids)
+
+    @property
+    def packet_tokens(self) -> int:
+        return sum(segment.tokens_used for segment in self.segment_stats)
+
+    @property
+    def tail_tokens(self) -> int:
+        return self.total_tokens - self.packet_tokens
 
     @property
     def bits_per_token(self) -> float:
@@ -138,6 +148,12 @@ class StegoEncoder:
                     f"{self.config.codec.low_entropy_window_tokens} consecutive tokens "
                     f"across {attempt_index + 1} attempt(s). {retry_hint}"
                 ) from exc
+            self._extend_with_natural_tail(
+                packet=packet,
+                prompt=prompt,
+                generated_token_ids=token_ids,
+                attempt_index=attempt_index,
+            )
 
             return EncodeResult(
                 text=self.backend.render(token_ids),
@@ -197,6 +213,63 @@ class StegoEncoder:
         )
         stats.append(body_stats)
         return token_ids, stats
+
+    def _extend_with_natural_tail(
+        self,
+        *,
+        packet: bytes,
+        prompt: str,
+        generated_token_ids: list[int],
+        attempt_index: int,
+    ) -> None:
+        max_tail_tokens = self.config.codec.natural_tail_max_tokens
+        if max_tail_tokens <= 0:
+            return
+
+        recent_text = self.backend.render(generated_token_ids)[-64:]
+        if self._looks_naturally_finished(recent_text):
+            return
+
+        rng = random.Random(self._natural_tail_seed(packet=packet, attempt_index=attempt_index))
+        for _ in range(max_tail_tokens):
+            quantized = prepare_quantized_distribution(
+                self.backend,
+                prompt=prompt,
+                generated_token_ids=generated_token_ids,
+                config=self.config,
+            )
+            generated_token_ids.append(self._sample_tail_token_id(quantized, rng))
+            recent_text = self.backend.render(generated_token_ids)[-64:]
+            if self._looks_naturally_finished(recent_text):
+                break
+
+    def _natural_tail_seed(self, *, packet: bytes, attempt_index: int) -> int:
+        payload = (
+            self.config.seed.to_bytes(8, "big", signed=True)
+            + attempt_index.to_bytes(4, "big", signed=False)
+            + packet
+        )
+        return int.from_bytes(sha256(payload).digest()[:8], "big")
+
+    def _sample_tail_token_id(self, distribution, rng: random.Random) -> int:
+        if len(distribution.entries) == 1:
+            return distribution.top.token_id
+        draw = rng.random()
+        cumulative = 0.0
+        for entry in distribution.entries:
+            cumulative += entry.probability
+            if draw <= cumulative:
+                return entry.token_id
+        return distribution.entries[-1].token_id
+
+    def _looks_naturally_finished(self, text: str) -> bool:
+        trimmed = text.rstrip()
+        if not trimmed:
+            return False
+        return (
+            trimmed.endswith((".", "!", "?", "。", "！", "？"))
+            or trimmed.endswith("\n\n")
+        )
 
     def _encode_segment(
         self,

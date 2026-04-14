@@ -17,6 +17,7 @@ HideText 是一个确定性的文本隐写 demo：它不是先生成自然语言
 - `encode` / `decode` / `eval` CLI
 - 对 prompt 漂移、seed 漂移、文本改动、重试耗尽的 fail-closed 测试
 - 低熵监测与自动重试
+- secret-bearing prefix 完成后的自然尾部生成
 
 ## 快速开始
 
@@ -91,6 +92,17 @@ HIDETEXT_LLAMA_BATCH=128 \
 
 如果你在做固定 packet 的受控实验，可以传 `--low-entropy-window-tokens 0` 显式关闭这个 detector。
 
+## 自然结束
+
+HideText 现在不必在 packet 刚好可解码的那个 token 上硬停。只要 header 和 body 都已经编码完成：
+
+- 承载秘密的前缀已经完整，可被解码
+- 发送端可以继续随机采样一小段尾部，让文本结尾更自然
+- 这段尾部不参与 codec，解码端会直接忽略
+- 解码端在 packet 完整恢复后就停止，不要求文本也在那个位置结束
+
+可以用 `--natural-tail-max-tokens` 限制这段尾部的最大长度；如果传 `0`，就会回到“编码完成立即停止”的旧行为。
+
 ## CLI 用法
 
 toy backend round-trip：
@@ -118,6 +130,7 @@ toy backend round-trip：
   --totfreq 4096 \
   --header-token-budget 1024 \
   --body-token-budget 4096 \
+  --natural-tail-max-tokens 64 \
   --stall-patience-tokens 256 \
   --low-entropy-window-tokens 32 \
   --low-entropy-threshold-bits 0.1 \
@@ -222,7 +235,8 @@ tests/
 
 - packet 采用 `固定头 + 显式长度 body` 两阶段编码
 - 核心 codec 使用整数区间收缩，不依赖浮点比较
-- 解码器在 prompt、seed、token 或配置漂移时都会 fail closed
+- 解码器在秘密前缀内部遇到 prompt、seed、token 或配置漂移时都会 fail closed
+- packet 前缀恢复后，编码器可以继续追加不参与编解码的自然尾部，解码器会忽略它
 - 低熵重试属于发送端运行时安全策略，不属于共享解码 fingerprint
 - toy backend 适合快速验证协议；Qwen `llama.cpp` backend 对应真实本地 CPU 路径
 

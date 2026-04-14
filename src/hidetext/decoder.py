@@ -19,9 +19,14 @@ class DecodeResult:
     plaintext: str
     packet: bytes
     token_ids: tuple[int, ...]
+    trailing_token_ids: tuple[int, ...]
     header: PacketHeader
     consumed_tokens: int
     elapsed_seconds: float
+
+    @property
+    def trailing_tokens(self) -> int:
+        return len(self.trailing_token_ids)
 
     @property
     def tokens_per_second(self) -> float:
@@ -90,8 +95,6 @@ class StegoDecoder:
             start_time=start_time,
             progress_callback=progress_callback,
         )
-        if cursor != len(observed_token_ids):
-            raise SynchronizationError("stego text contains trailing tokens after packet end")
 
         packet = header_bytes + body_bytes
         plaintext_bytes = decrypt_packet(
@@ -105,6 +108,7 @@ class StegoDecoder:
             plaintext=plaintext_bytes.decode("utf-8"),
             packet=packet,
             token_ids=tuple(observed_token_ids),
+            trailing_token_ids=tuple(observed_token_ids[cursor:]),
             header=header,
             consumed_tokens=cursor,
             elapsed_seconds=perf_counter() - start_time,

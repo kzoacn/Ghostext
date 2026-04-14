@@ -30,6 +30,7 @@ class CodecConfig:
     total_frequency: int = 65536
     max_header_tokens: int = 1024
     max_body_tokens: int = 4096
+    natural_tail_max_tokens: int = 64
     stall_patience_tokens: int = 256
     low_entropy_window_tokens: int = 32
     low_entropy_threshold_bits: float = 0.1

@@ -326,8 +326,10 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_
 - 接收端在头 segment 区间宽度变为 `1` 后即可恢复 header
 - header 中给出 `salt_len`、`nonce_len` 和 `ct_len`，从而确定 body segment 的精确长度
 - 再对 body segment 执行同样的区间编码
-- 发送端在两个 segment 都收敛后停止生成
-- 接收端在 body segment 完整恢复后停止解码
+- 一旦两个 segment 都收敛，秘密载荷已经完整可恢复
+- 发送端此时可以选择继续生成一小段 `natural tail`
+- 这段 `natural tail` 不参与 codec，只用于让输出文本更自然地收尾
+- 接收端在 body segment 完整恢复后停止解码，并忽略后续 trailing tokens
 
 这样可以避免在 packet 总长度未知时直接对整包做一次性编码。
 
@@ -349,6 +351,14 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_
 - 当 `low_entropy_window_tokens <= 0` 时，可显式关闭这个 detector，用于固定 packet 的受控实验
 - 这样可以比单纯等待 stall detector 更早发现“候选集虽然还在变化，但平均信息量已经接近 0 bit”的路径
 
+当前实现还加入了 `natural tail` 运行策略：
+
+- 一旦 packet 已经完整编码，发送端不必立刻停止
+- 发送端可以继续按正常采样规则生成少量额外 token，直到看起来像自然结尾或达到上限
+- `natural_tail_max_tokens` 是发送端本地运行时参数，不进入 packet 指纹
+- trailing tail 不参与解码，因此不会影响 packet 恢复
+- 如果需要严格复现实验，也可以把 `natural_tail_max_tokens` 设为 `0`
+
 ## 16. 推荐默认参数
 
 这些参数是建议值，不是强制常数：
@@ -360,6 +370,7 @@ max_candidates = 32 或 64
 min_entropy_bits = 1.0 ~ 1.5
 totfreq = 65536
 range_precision_bits = 64
+natural_tail_max_tokens = 64
 low_entropy_window_tokens = 32
 low_entropy_threshold_bits = 0.1
 max_encode_attempts = 3
@@ -385,6 +396,7 @@ max_encode_attempts = 3
 9. 解码得到的 packet 无法通过 AEAD 校验
 10. 真实模型进入长时间零容量 stall
 11. 真实模型进入持续低熵区，连续多个 token 的平均熵接近 0，导致同一次 packet 路径无法完成编码
+12. 文本尾部被额外追加内容；此时只要 packet-bearing prefix 未变，解码应忽略 trailing tail 而不是误把它当成协议错误
 
 默认处理方式：
 
@@ -445,6 +457,7 @@ max_encode_attempts = 3
 - 故意改一处 token
 - 构造连续低熵窗口，验证发送端会自动重试
 - 构造连续低熵且重试次数耗尽，验证会明确失败并给出建议
+- 验证 packet 恢复后追加 trailing tail 不影响解码
 
 应观察到：
 

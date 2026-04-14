@@ -94,17 +94,28 @@ class FailureTests(unittest.TestCase):
             )
 
     def test_mutated_text_fails(self) -> None:
-        mutated = self.encoded.text[:-1] + (
+        packet_text = self.encoded.text[: self.encoded.packet_tokens]
+        mutated_packet_text = packet_text[:-1] + (
             "。"
-            if self.encoded.text[-1] != "。"
+            if packet_text[-1] != "。"
             else "，"
         )
+        mutated = mutated_packet_text + self.encoded.text[self.encoded.packet_tokens :]
         with self.assertRaises(HideTextError):
             StegoDecoder(self.backend, self.config).decode(
                 mutated,
                 passphrase=self.passphrase,
                 prompt=self.prompt,
             )
+
+    def test_decoder_ignores_trailing_tail_tokens(self) -> None:
+        decoded = StegoDecoder(self.backend, self.config).decode(
+            self.encoded.text + "。",
+            passphrase=self.passphrase,
+            prompt=self.prompt,
+        )
+        self.assertEqual(decoded.plaintext, self.message)
+        self.assertGreater(decoded.trailing_tokens, 0)
 
     def test_stall_detector_fails_closed(self) -> None:
         class StallingBackend:

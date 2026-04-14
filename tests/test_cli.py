@@ -55,6 +55,9 @@ class CliTests(unittest.TestCase):
             "11",
         )
         self.assertEqual(decoded["plaintext"], message)
+        self.assertIn("packet_tokens", encoded)
+        self.assertIn("tail_tokens", encoded)
+        self.assertIn("trailing_tokens", decoded)
 
     def test_encode_then_decode_with_files(self) -> None:
         prompt = "请写一段温柔自然的中文短文。"
@@ -94,6 +97,8 @@ class CliTests(unittest.TestCase):
                 str(seed_path),
             )
             self.assertEqual(decoded["plaintext"], message)
+            self.assertIn("tail_tokens", encoded)
+            self.assertIn("trailing_tokens", decoded)
 
     def test_eval_progress_goes_to_stderr(self) -> None:
         completed = self._run_completed(
@@ -112,6 +117,8 @@ class CliTests(unittest.TestCase):
         )
         payload = json.loads(completed.stdout)
         self.assertTrue(payload["roundtrip_ok"])
+        self.assertIn("tail_tokens", payload)
+        self.assertIn("decode_trailing_tokens", payload)
         self.assertIn("[encode][header]", completed.stderr)
         self.assertIn("bits=", completed.stderr)
         self.assertIn("tps=", completed.stderr)
@@ -128,6 +135,8 @@ class CliTests(unittest.TestCase):
             "CLI roundtrip works.",
             "--seed",
             "11",
+            "--natural-tail-max-tokens",
+            "8",
             "--stall-patience-tokens",
             "64",
             "--low-entropy-window-tokens",
@@ -139,6 +148,7 @@ class CliTests(unittest.TestCase):
         )
         self.assertIn("text", payload)
         self.assertIn("attempts_used", payload)
+        self.assertIn("tail_tokens", payload)
 
 
 if __name__ == "__main__":
