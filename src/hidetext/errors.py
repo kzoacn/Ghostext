@@ -6,10 +6,6 @@ class PacketError(HideTextError):
     """Raised when packet framing is invalid."""
 
 
-class MagicMismatchError(PacketError):
-    """Raised when the packet magic is not recognized."""
-
-
 class ConfigMismatchError(HideTextError):
     """Raised when runtime configuration does not match the packet."""
 

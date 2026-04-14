@@ -13,7 +13,7 @@ from hidetext.errors import (
     UnsafeTokenizationError,
 )
 from hidetext.model_backend import BackendMetadata, RawNextTokenDistribution, ToyCharBackend
-from hidetext.packet import HEADER_SIZE
+from hidetext.packet import packet_bootstrap_size
 
 
 class RetrySensitiveBackend:
@@ -23,7 +23,7 @@ class RetrySensitiveBackend:
             tokenizer_hash="retry-sensitive-hash",
             backend_id="retry-sensitive",
         )
-        self._header_tokens = HEADER_SIZE * 8
+        self._header_tokens = packet_bootstrap_size(16, 12) * 8
 
     @property
     def metadata(self) -> BackendMetadata:
@@ -213,7 +213,7 @@ class FailureTests(unittest.TestCase):
             ),
             codec=CodecConfig(
                 total_frequency=2,
-                max_header_tokens=HEADER_SIZE * 8,
+                max_header_tokens=packet_bootstrap_size(16, 12) * 8,
                 max_body_tokens=32,
                 stall_patience_tokens=0,
                 low_entropy_window_tokens=4,
@@ -221,8 +221,9 @@ class FailureTests(unittest.TestCase):
                 max_encode_attempts=3,
             ),
         )
-        first_packet = (b"H" * HEADER_SIZE) + b"\x00"
-        second_packet = (b"H" * HEADER_SIZE) + b"\x80"
+        bootstrap_len = packet_bootstrap_size(16, 12)
+        first_packet = (b"H" * bootstrap_len) + b"\x00"
+        second_packet = (b"H" * bootstrap_len) + b"\x80"
         with mock.patch(
             "hidetext.encoder.build_packet",
             side_effect=[first_packet, second_packet],
@@ -235,7 +236,7 @@ class FailureTests(unittest.TestCase):
 
         self.assertEqual(build_packet_mock.call_count, 2)
         self.assertEqual(result.attempts_used, 2)
-        self.assertGreater(result.total_tokens, HEADER_SIZE * 8)
+        self.assertGreater(result.total_tokens, packet_bootstrap_size(16, 12) * 8)
 
     def test_low_entropy_retry_limit_reports_actionable_error(self) -> None:
         backend = RetrySensitiveBackend()
@@ -248,7 +249,7 @@ class FailureTests(unittest.TestCase):
             ),
             codec=CodecConfig(
                 total_frequency=2,
-                max_header_tokens=HEADER_SIZE * 8,
+                max_header_tokens=packet_bootstrap_size(16, 12) * 8,
                 max_body_tokens=32,
                 stall_patience_tokens=0,
                 low_entropy_window_tokens=4,
@@ -256,7 +257,7 @@ class FailureTests(unittest.TestCase):
                 max_encode_attempts=3,
             ),
         )
-        failing_packet = (b"H" * HEADER_SIZE) + b"\x00"
+        failing_packet = (b"H" * packet_bootstrap_size(16, 12)) + b"\x00"
         with mock.patch(
             "hidetext.encoder.build_packet",
             side_effect=[failing_packet, failing_packet, failing_packet],
@@ -281,8 +282,9 @@ class FailureTests(unittest.TestCase):
             ),
         )
         encoder = StegoEncoder(backend, config)
-        first_packet = (b"H" * HEADER_SIZE) + b"\x00"
-        second_packet = (b"H" * HEADER_SIZE) + b"\x01"
+        bootstrap_len = packet_bootstrap_size(16, 12)
+        first_packet = (b"H" * bootstrap_len) + b"\x00"
+        second_packet = (b"H" * bootstrap_len) + b"\x01"
         with mock.patch(
             "hidetext.encoder.build_packet",
             side_effect=[first_packet, second_packet],
@@ -316,9 +318,9 @@ class FailureTests(unittest.TestCase):
         )
         encoder = StegoEncoder(backend, config)
         packets = [
-            (b"H" * HEADER_SIZE) + b"\x00",
-            (b"H" * HEADER_SIZE) + b"\x01",
-            (b"H" * HEADER_SIZE) + b"\x02",
+            (b"H" * packet_bootstrap_size(16, 12)) + b"\x00",
+            (b"H" * packet_bootstrap_size(16, 12)) + b"\x01",
+            (b"H" * packet_bootstrap_size(16, 12)) + b"\x02",
         ]
         with mock.patch(
             "hidetext.encoder.build_packet",

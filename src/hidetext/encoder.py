@@ -16,7 +16,7 @@ from .errors import (
     UnsafeTokenizationError,
 )
 from .model_backend import TextBackend
-from .packet import HEADER_SIZE
+from .packet import packet_bootstrap_size
 from .pipeline import prepare_quantized_distribution
 from .progress import ProgressCallback, ProgressSnapshot
 
@@ -191,9 +191,13 @@ class StegoEncoder:
             threshold_bits=self.config.codec.low_entropy_threshold_bits,
         )
 
+        bootstrap_size = packet_bootstrap_size(
+            self.config.crypto.salt_len,
+            self.config.crypto.nonce_len,
+        )
         header_stats = self._encode_segment(
             segment_name="header",
-            payload=packet[:HEADER_SIZE],
+            payload=packet[:bootstrap_size],
             prompt=prompt,
             generated_token_ids=token_ids,
             max_tokens=self.config.codec.max_header_tokens,
@@ -204,11 +208,11 @@ class StegoEncoder:
             low_entropy_window=low_entropy_window,
         )
         stats.append(header_stats)
-        completed_bits += len(packet[:HEADER_SIZE]) * 8
+        completed_bits += bootstrap_size * 8
 
         body_stats = self._encode_segment(
             segment_name="body",
-            payload=packet[HEADER_SIZE:],
+            payload=packet[bootstrap_size:],
             prompt=prompt,
             generated_token_ids=token_ids,
             max_tokens=self.config.codec.max_body_tokens,

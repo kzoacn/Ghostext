@@ -5,10 +5,10 @@ from time import perf_counter
 
 from .codec import MessageSegmentDecoder
 from .config import RuntimeConfig
-from .crypto import decrypt_packet
-from .errors import ConfigMismatchError, PacketError, SynchronizationError
+from .crypto import decrypt_bootstrap_header, decrypt_packet
+from .errors import IntegrityError, PacketError, SynchronizationError
 from .model_backend import TextBackend
-from .packet import HEADER_SIZE, PacketHeader
+from .packet import InternalHeader, packet_bootstrap_size
 from .pipeline import prepare_quantized_distribution
 from .progress import ProgressCallback, ProgressSnapshot
 
@@ -20,7 +20,7 @@ class DecodeResult:
     packet: bytes
     token_ids: tuple[int, ...]
     trailing_token_ids: tuple[int, ...]
-    header: PacketHeader
+    header: InternalHeader
     consumed_tokens: int
     elapsed_seconds: float
 
@@ -58,9 +58,13 @@ class StegoDecoder:
         observed_token_ids = self.backend.tokenize(stego_text, prompt)
         consumed_token_ids: list[int] = []
         cursor = 0
+        bootstrap_size = packet_bootstrap_size(
+            self.config.crypto.salt_len,
+            self.config.crypto.nonce_len,
+        )
 
-        header_bytes, cursor = self._decode_segment(
-            payload_len=HEADER_SIZE,
+        bootstrap, cursor = self._decode_segment(
+            payload_len=bootstrap_size,
             observed_token_ids=observed_token_ids,
             cursor=cursor,
             consumed_token_ids=consumed_token_ids,
@@ -72,16 +76,19 @@ class StegoDecoder:
             start_time=start_time,
             progress_callback=progress_callback,
         )
-        header = PacketHeader.unpack(header_bytes)
+        header = self._decrypt_internal_header(
+            bootstrap=bootstrap,
+            passphrase=passphrase,
+        )
         expected_fp = self.config.config_fingerprint(
             backend_metadata=self.backend.metadata.as_dict(),
             prompt=prompt,
         )
         if header.config_fingerprint != expected_fp:
-            raise ConfigMismatchError("packet config fingerprint does not match runtime")
+            raise IntegrityError("packet config fingerprint does not match runtime")
 
-        body_len = header.body_len
-        total_bits = (HEADER_SIZE + body_len) * 8
+        body_len = self.config.crypto.nonce_len + header.body_ciphertext_len
+        total_bits = (bootstrap_size + body_len) * 8
         body_bytes, cursor = self._decode_segment(
             payload_len=body_len,
             observed_token_ids=observed_token_ids,
@@ -90,13 +97,13 @@ class StegoDecoder:
             prompt=prompt,
             max_tokens=self.config.codec.max_body_tokens,
             segment_name="body",
-            completed_bits_before=HEADER_SIZE * 8,
+            completed_bits_before=bootstrap_size * 8,
             overall_bits_total=total_bits,
             start_time=start_time,
             progress_callback=progress_callback,
         )
 
-        packet = header_bytes + body_bytes
+        packet = bootstrap + body_bytes
         plaintext_bytes = decrypt_packet(
             packet,
             passphrase=passphrase,
@@ -113,6 +120,21 @@ class StegoDecoder:
             consumed_tokens=cursor,
             elapsed_seconds=perf_counter() - start_time,
         )
+
+    def _decrypt_internal_header(
+        self,
+        *,
+        bootstrap: bytes,
+        passphrase: str,
+    ) -> InternalHeader:
+        try:
+            return decrypt_bootstrap_header(
+                bootstrap,
+                passphrase=passphrase,
+                crypto_config=self.config.crypto,
+            )
+        except IntegrityError as exc:
+            raise IntegrityError("failed to decrypt packet bootstrap header") from exc
 
     def _decode_segment(
         self,

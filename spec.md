@@ -190,23 +190,28 @@ HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 d
 当前实现采用固定长度头部，结构如下：
 
 ```text
-magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_len[1] | ct_len[4] | config_fingerprint[8] | salt[...] | nonce[...] | ciphertext_and_tag[ct_len]
+salt[salt_len] | header_nonce[nonce_len] | sealed_header[header_ct_len] | body_nonce[nonce_len] | body_ciphertext_and_tag[body_ct_len]
 ```
 
 说明：
 
-- `magic`：用于快速检测配置错误或恢复失败
-- `version`：协议版本
-- `flags`：保留位
-- `kdf_id`：密钥派生算法编号
-- `aead_id`：AEAD 算法编号
-- `salt_len`：KDF salt 长度
-- `nonce_len`：nonce 长度
-- `ct_len`：`ciphertext || tag` 的总长度
-- `config_fingerprint`：运行时协议配置、模型元数据与 prompt 的 64-bit 指纹
-- `salt`：KDF salt
-- `nonce`：AEAD nonce
-- `ciphertext_and_tag`：AEAD 输出
+- 第一版已升级为 `opaque packet v2`，不再保留明文 magic/header 字段
+- `salt`：KDF salt（随机）
+- `header_nonce`：用于加密内部 header 的 nonce
+- `sealed_header`：AEAD 加密后的内部 header，外观随机
+- `body_nonce`：用于加密正文的 nonce
+- `body_ciphertext_and_tag`：正文 AEAD 输出
+- `header_ct_len = internal_header_len + tag_len`，当前为固定长度
+- `body_ct_len` 由 `sealed_header` 解密后获得
+
+内部 header（不再明文暴露）包含：
+
+- `version`
+- `flags`
+- `kdf_id`
+- `aead_id`
+- `body_ct_len`
+- `config_fingerprint`
 
 第一版可选的默认密码学配置：
 
@@ -218,7 +223,12 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_
 - `KDF`: `scrypt`
 - `AEAD`: `ChaCha20-Poly1305`
 
-`header` 本身作为 AEAD 的 associated data 参与认证。
+当前实现的认证与密钥派生策略：
+
+- 先由 `passphrase + salt` 通过 `scrypt` 派生 `master_key`
+- 再用 `HKDF-SHA256` 派生 `header_key` 与 `body_key`（key separation）
+- `sealed_header` 与 `body_ciphertext` 分别用不同子密钥加密
+- 两段都使用 `ChaCha20-Poly1305`，失败时都应 fail-closed
 
 ## 12. Cover Text 与 Prompt
 
@@ -344,11 +354,11 @@ magic[4] | version[1] | flags[1] | kdf_id[1] | aead_id[1] | salt_len[1] | nonce_
 
 ### 15.3 终止条件
 
-当前实现采用 `固定头 segment + 显式长度体 segment` 的两阶段停止策略：
+当前实现采用 `固定 bootstrap segment + 显式长度体 segment` 的两阶段停止策略：
 
-- 先把固定长度 packet 头编码为第一个 segment
-- 接收端在头 segment 区间宽度变为 `1` 后即可恢复 header
-- header 中给出 `salt_len`、`nonce_len` 和 `ct_len`，从而确定 body segment 的精确长度
+- 先把固定长度 `bootstrap`（`salt + header_nonce + sealed_header`）编码为第一个 segment
+- 接收端在 bootstrap segment 区间宽度变为 `1` 后可解密出内部 header
+- 内部 header 给出 `body_ct_len`，从而确定 body segment 的精确长度（另加 `body_nonce`）
 - 再对 body segment 执行同样的区间编码
 - 一旦两个 segment 都收敛，秘密载荷已经完整可恢复
 - 发送端此时可以选择继续生成一小段 `natural tail`

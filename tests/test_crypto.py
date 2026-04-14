@@ -1,9 +1,10 @@
 import unittest
 
 from hidetext.config import RuntimeConfig
-from hidetext.crypto import build_packet, decrypt_packet
+from hidetext.crypto import build_packet, decrypt_bootstrap_header, decrypt_packet
 from hidetext.errors import ConfigMismatchError, IntegrityError
 from hidetext.model_backend import ToyCharBackend
+from hidetext.packet import packet_bootstrap_size
 
 
 class CryptoTests(unittest.TestCase):
@@ -67,7 +68,44 @@ class CryptoTests(unittest.TestCase):
                 crypto_config=self.config.crypto,
             )
 
+    def test_bootstrap_header_is_not_plaintext(self) -> None:
+        packet = build_packet(
+            b"secret message",
+            passphrase="hunter2",
+            config_fingerprint=self.fingerprint,
+            crypto_config=self.config.crypto,
+            salt=b"s" * self.config.crypto.salt_len,
+            nonce=b"n" * self.config.crypto.nonce_len,
+        )
+        bootstrap_len = packet_bootstrap_size(
+            self.config.crypto.salt_len,
+            self.config.crypto.nonce_len,
+        )
+        bootstrap = packet[:bootstrap_len]
+        self.assertNotIn(b"HDTX", bootstrap)
+        self.assertNotEqual(bootstrap[:4], b"HDTX")
+
+    def test_decrypt_bootstrap_header_roundtrip(self) -> None:
+        packet = build_packet(
+            b"secret message",
+            passphrase="hunter2",
+            config_fingerprint=self.fingerprint,
+            crypto_config=self.config.crypto,
+            salt=b"s" * self.config.crypto.salt_len,
+            nonce=b"n" * self.config.crypto.nonce_len,
+        )
+        bootstrap_len = packet_bootstrap_size(
+            self.config.crypto.salt_len,
+            self.config.crypto.nonce_len,
+        )
+        header = decrypt_bootstrap_header(
+            packet[:bootstrap_len],
+            passphrase="hunter2",
+            crypto_config=self.config.crypto,
+        )
+        self.assertEqual(header.config_fingerprint, self.fingerprint)
+        self.assertGreater(header.body_ciphertext_len, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
-
