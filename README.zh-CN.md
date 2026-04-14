@@ -29,6 +29,14 @@ python3 -m venv .venv
   --passphrase demo-pass
 ```
 
+查看完整命令帮助：
+
+```bash
+.venv/bin/hidetext --help
+.venv/bin/hidetext encode --help
+.venv/bin/hidetext decode --help
+```
+
 第一次运行时，HideText 会按下面的顺序找模型：
 
 - 先看你有没有传 `--model-path`

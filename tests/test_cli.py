@@ -45,6 +45,16 @@ class CliTests(unittest.TestCase):
         completed = self._run_completed(*args)
         return json.loads(completed.stdout)
 
+    def test_top_level_help_lists_encode_decode(self) -> None:
+        completed = self._run_completed("--help")
+        self.assertIn("{encode,decode}", completed.stdout)
+        self.assertIn("subcommand to run", completed.stdout)
+
+    def test_encode_help_mentions_message_and_quiet(self) -> None:
+        completed = self._run_completed("encode", "--help")
+        self.assertIn("--message", completed.stdout)
+        self.assertIn("--quiet", completed.stdout)
+
     def test_encode_then_decode(self) -> None:
         prompt = "Write a calm and readable English paragraph."
         passphrase = "cli-pass"

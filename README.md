@@ -29,6 +29,14 @@ Run a quick encode/decode round-trip check:
   --passphrase demo-pass
 ```
 
+See all command options:
+
+```bash
+.venv/bin/hidetext --help
+.venv/bin/hidetext encode --help
+.venv/bin/hidetext decode --help
+```
+
 On the first run, HideText will:
 
 - look for a local model from `--model-path`

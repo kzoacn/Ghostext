@@ -34,22 +34,44 @@ from .progress import ProgressSnapshot
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="hidetext")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(
+        prog="hidetext",
+        description=(
+            "HideText CLI: encode encrypted payloads into generated text and decode them back "
+            "with the same model/prompt/passphrase/seed."
+        ),
+    )
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        metavar="{encode,decode}",
+        help="subcommand to run",
+    )
 
     for name in ("encode", "decode"):
-        subparser = subparsers.add_parser(name)
+        if name == "encode":
+            subparser = subparsers.add_parser(
+                "encode",
+                help="hide a message into generated text",
+                description="Encode a secret message into cover text.",
+            )
+        else:
+            subparser = subparsers.add_parser(
+                "decode",
+                help="recover a message from stego text",
+                description="Decode a secret message from stego text.",
+            )
         prompt_group = subparser.add_mutually_exclusive_group(required=True)
-        prompt_group.add_argument("--prompt")
-        prompt_group.add_argument("--prompt-file")
+        prompt_group.add_argument("--prompt", help="shared prompt text")
+        prompt_group.add_argument("--prompt-file", help="file containing shared prompt text")
 
         passphrase_group = subparser.add_mutually_exclusive_group(required=True)
-        passphrase_group.add_argument("--passphrase")
-        passphrase_group.add_argument("--passphrase-file")
+        passphrase_group.add_argument("--passphrase", help="shared passphrase")
+        passphrase_group.add_argument("--passphrase-file", help="file containing shared passphrase")
 
         seed_group = subparser.add_mutually_exclusive_group(required=False)
-        seed_group.add_argument("--seed", type=int)
-        seed_group.add_argument("--seed-file")
+        seed_group.add_argument("--seed", type=int, help="shared deterministic seed")
+        seed_group.add_argument("--seed-file", help="file containing shared seed")
         subparser.add_argument(
             "--backend",
             choices=("llama-cpp", "toy"),
@@ -64,51 +86,69 @@ def _build_parser() -> argparse.ArgumentParser:
             "--model-id",
             help="optional model identifier for protocol metadata; custom model paths infer this by default",
         )
-        subparser.add_argument("--threads", type=int)
-        subparser.add_argument("--ctx-size", type=int, default=DEFAULT_CTX_SIZE)
-        subparser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
-        subparser.add_argument("--top-p", type=float, default=DEFAULT_TOP_P)
-        subparser.add_argument("--max-candidates", type=int, default=DEFAULT_MAX_CANDIDATES)
+        subparser.add_argument("--threads", type=int, help="CPU threads for llama.cpp backend")
+        subparser.add_argument("--ctx-size", type=int, default=DEFAULT_CTX_SIZE, help="context size")
+        subparser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="batch size")
+        subparser.add_argument("--top-p", type=float, default=DEFAULT_TOP_P, help="candidate top-p")
+        subparser.add_argument(
+            "--max-candidates",
+            type=int,
+            default=DEFAULT_MAX_CANDIDATES,
+            help="candidate cap per decoding step",
+        )
         subparser.add_argument(
             "--min-entropy-bits",
             type=float,
             default=DEFAULT_MIN_ENTROPY_BITS,
+            help="minimum entropy to allow embedding on a step",
         )
-        subparser.add_argument("--totfreq", type=int, default=DEFAULT_TOTAL_FREQUENCY)
+        subparser.add_argument(
+            "--totfreq",
+            type=int,
+            default=DEFAULT_TOTAL_FREQUENCY,
+            help="integer total frequency for quantization",
+        )
         subparser.add_argument(
             "--header-token-budget",
             type=int,
             default=DEFAULT_HEADER_TOKEN_BUDGET,
+            help="max tokens for bootstrap/header segment",
         )
         subparser.add_argument(
             "--body-token-budget",
             type=int,
             default=DEFAULT_BODY_TOKEN_BUDGET,
+            help="max tokens for body segment",
         )
         subparser.add_argument(
             "--natural-tail-max-tokens",
             type=int,
             default=DEFAULT_NATURAL_TAIL_MAX_TOKENS,
+            help="max non-coded natural tail tokens after packet embedding",
         )
         subparser.add_argument(
             "--stall-patience-tokens",
             type=int,
             default=DEFAULT_STALL_PATIENCE_TOKENS,
+            help="consecutive no-progress tokens before failing",
         )
         subparser.add_argument(
             "--low-entropy-window-tokens",
             type=int,
             default=DEFAULT_LOW_ENTROPY_WINDOW_TOKENS,
+            help="rolling window size for low-entropy detector (0 disables)",
         )
         subparser.add_argument(
             "--low-entropy-threshold-bits",
             type=float,
             default=DEFAULT_LOW_ENTROPY_THRESHOLD_BITS,
+            help="average entropy threshold for triggering retry",
         )
         subparser.add_argument(
             "--max-encode-attempts",
             type=int,
             default=DEFAULT_MAX_ENCODE_ATTEMPTS,
+            help="maximum encode retries with fresh packet",
         )
         subparser.add_argument(
             "--quiet",
@@ -119,17 +159,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "--progress-token-interval",
             type=int,
             default=DEFAULT_PROGRESS_TOKEN_INTERVAL,
+            help="token interval between progress updates",
         )
 
     encode_parser = subparsers.choices["encode"]
-    encode_parser.add_argument("--message", required=True)
-    encode_parser.add_argument("--json", action="store_true")
+    encode_parser.add_argument("--message", required=True, help="secret message to embed")
+    encode_parser.add_argument("--json", action="store_true", help="print structured JSON output")
 
     decode_parser = subparsers.choices["decode"]
     decode_text_group = decode_parser.add_mutually_exclusive_group(required=False)
-    decode_text_group.add_argument("--text")
-    decode_text_group.add_argument("--text-file")
-    decode_parser.add_argument("--json", action="store_true")
+    decode_text_group.add_argument("--text", help="stego text to decode")
+    decode_text_group.add_argument("--text-file", help="file containing stego text")
+    decode_parser.add_argument("--json", action="store_true", help="print structured JSON output")
 
     return parser
 
