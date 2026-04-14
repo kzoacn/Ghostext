@@ -37,7 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hidetext")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for name in ("encode", "decode", "eval"):
+    for name in ("encode", "decode"):
         subparser = subparsers.add_parser(name)
         prompt_group = subparser.add_mutually_exclusive_group(required=True)
         prompt_group.add_argument("--prompt")
@@ -110,7 +110,11 @@ def _build_parser() -> argparse.ArgumentParser:
             type=int,
             default=DEFAULT_MAX_ENCODE_ATTEMPTS,
         )
-        subparser.add_argument("--show-progress", action="store_true")
+        subparser.add_argument(
+            "--quiet",
+            action="store_true",
+            help="disable progress logs",
+        )
         subparser.add_argument(
             "--progress-token-interval",
             type=int,
@@ -127,8 +131,6 @@ def _build_parser() -> argparse.ArgumentParser:
     decode_text_group.add_argument("--text-file")
     decode_parser.add_argument("--json", action="store_true")
 
-    eval_parser = subparsers.choices["eval"]
-    eval_parser.add_argument("--message", required=True)
     return parser
 
 
@@ -256,7 +258,7 @@ def _resolve_model_id(args: argparse.Namespace, *, resolved_model_source: str) -
 
 
 def _build_progress_reporter(args: argparse.Namespace):
-    if not args.show_progress:
+    if args.quiet:
         return None
 
     interval = max(1, args.progress_token_interval)
@@ -351,11 +353,13 @@ def main() -> None:
     progress_reporter = _build_progress_reporter(args)
 
     if args.command == "encode":
+        retry_notice = None if args.quiet else (lambda line: print(line, file=sys.stderr, flush=True))
         result = StegoEncoder(backend, config).encode(
             args.message,
             passphrase=passphrase,
             prompt=prompt,
             progress_callback=progress_reporter,
+            retry_notice_callback=retry_notice,
         )
         if args.json:
             print(
@@ -417,45 +421,6 @@ def main() -> None:
             )
         else:
             _write_plain_output(result.plaintext)
-        return
-
-    if args.command == "eval":
-        encoder = StegoEncoder(backend, config)
-        decoder = StegoDecoder(backend, config)
-        encoded = encoder.encode(
-            args.message,
-            passphrase=passphrase,
-            prompt=prompt,
-            progress_callback=progress_reporter,
-        )
-        decoded = decoder.decode(
-            encoded.text,
-            passphrase=passphrase,
-            prompt=prompt,
-            progress_callback=progress_reporter,
-        )
-        print(
-            json.dumps(
-                {
-                    "roundtrip_ok": decoded.plaintext == args.message,
-                    "backend": args.backend,
-                    "text": encoded.text,
-                    "packet_len": len(encoded.packet),
-                    "total_tokens": encoded.total_tokens,
-                    "packet_tokens": encoded.packet_tokens,
-                    "tail_tokens": encoded.tail_tokens,
-                    "decode_trailing_tokens": decoded.trailing_tokens,
-                    "attempts_used": encoded.attempts_used,
-                    "encode_elapsed_seconds": round(encoded.elapsed_seconds, 4),
-                    "decode_elapsed_seconds": round(decoded.elapsed_seconds, 4),
-                    "encode_tokens_per_second": round(encoded.tokens_per_second, 4),
-                    "decode_tokens_per_second": round(decoded.tokens_per_second, 4),
-                    "bits_per_token": round(encoded.bits_per_token, 4),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
         return
 
     raise AssertionError(f"unsupported command: {args.command}")

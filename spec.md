@@ -92,7 +92,7 @@ HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 d
 5. `range/arithmetic codec`
    - 利用每一步的离散分布把 packet 映射到 token 选择
 6. `pipeline + cli`
-   - 为用户暴露 encode / decode / eval 接口
+   - 为用户暴露 encode / decode 接口
 
 ## 7. 默认运行环境
 
@@ -415,7 +415,7 @@ range_precision_bits = 64
 natural_tail_max_tokens = 64
 low_entropy_window_tokens = 32
 low_entropy_threshold_bits = 0.1
-max_encode_attempts = 3
+max_encode_attempts = 10
 ```
 
 设计原则：
@@ -436,7 +436,7 @@ totfreq = 4096
 natural_tail_max_tokens = 64
 low_entropy_window_tokens = 32
 low_entropy_threshold_bits = 0.1
-max_encode_attempts = 3
+max_encode_attempts = 10
 ```
 
 目标是让普通用户通常只需要提供：
@@ -444,7 +444,7 @@ max_encode_attempts = 3
 - `prompt`
 - `passphrase`
 - `message`
-- 以及可选的 `show-progress`
+- 以及可选的 `quiet`（默认显示进度）
 
 ## 17. 失败模式
 

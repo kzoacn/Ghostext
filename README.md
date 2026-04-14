@@ -17,14 +17,16 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[llm]'
 ```
 
-Run a one-command round-trip check:
+Run a quick encode/decode round-trip check:
 
 ```bash
-.venv/bin/hidetext eval \
-  --show-progress \
+.venv/bin/hidetext encode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
-  --message 'Meet near the riverside at seven.'
+  --message 'Meet near the riverside at seven.' \
+| .venv/bin/hidetext decode \
+  --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
+  --passphrase demo-pass
 ```
 
 On the first run, HideText will:
@@ -45,7 +47,6 @@ Most of the time, `encode` only needs these arguments:
 
 ```bash
 .venv/bin/hidetext encode \
-  --show-progress \
   --prompt '请写一段自然、连贯、简短的中文段落，描写傍晚散步时看到的街景。' \
   --passphrase 'river-pass' \
   --message '今晚七点在河边老地方见。'
@@ -55,12 +56,10 @@ Most of the time, `encode` only needs these arguments:
 
 ```bash
 .venv/bin/hidetext encode \
-  --show-progress \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
 | .venv/bin/hidetext decode \
-  --show-progress \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass
 ```
@@ -69,14 +68,12 @@ If you want to keep the generated text:
 
 ```bash
 .venv/bin/hidetext encode \
-  --show-progress \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
   > stego.txt
 
 .venv/bin/hidetext decode \
-  --show-progress \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --text-file stego.txt
@@ -112,23 +109,29 @@ These are the values used when you do not override them.
 Use a model you already have:
 
 ```bash
-.venv/bin/hidetext eval \
+.venv/bin/hidetext encode \
   --model-path /abs/path/to/model.gguf \
-  --show-progress \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
-  --message 'Meet near the riverside at seven.'
+  --message 'Meet near the riverside at seven.' \
+| .venv/bin/hidetext decode \
+  --model-path /abs/path/to/model.gguf \
+  --prompt 'Write a short paragraph about a quiet evening walk.' \
+  --passphrase demo-pass
 ```
 
 Change the default download directory:
 
 ```bash
 HIDETEXT_MODEL_DIR=/data/hidetext-models \
-.venv/bin/hidetext eval \
-  --show-progress \
+.venv/bin/hidetext encode \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
-  --message 'Meet near the riverside at seven.'
+  --message 'Meet near the riverside at seven.' \
+| HIDETEXT_MODEL_DIR=/data/hidetext-models \
+  .venv/bin/hidetext decode \
+  --prompt 'Write a short paragraph about a quiet evening walk.' \
+  --passphrase demo-pass
 ```
 
 Show structured metadata:
@@ -136,7 +139,16 @@ Show structured metadata:
 ```bash
 .venv/bin/hidetext encode \
   --json \
-  --show-progress \
+  --prompt 'Write a short paragraph about a quiet evening walk.' \
+  --passphrase demo-pass \
+  --message 'Meet near the riverside at seven.'
+```
+
+Disable logs when you want fully quiet output:
+
+```bash
+.venv/bin/hidetext encode \
+  --quiet \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.'
@@ -147,11 +159,15 @@ Show structured metadata:
 `ToyCharBackend` is still available, but it is for tests and protocol experiments rather than normal use:
 
 ```bash
-.venv/bin/hidetext eval \
+.venv/bin/hidetext encode \
   --backend toy \
   --prompt 'Write a calm and readable English paragraph.' \
   --passphrase test-pass \
-  --message 'toy backend roundtrip'
+  --message 'toy backend roundtrip' \
+| .venv/bin/hidetext decode \
+  --backend toy \
+  --prompt 'Write a calm and readable English paragraph.' \
+  --passphrase test-pass
 ```
 
 ## Tests

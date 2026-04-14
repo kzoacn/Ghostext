@@ -4,7 +4,9 @@ from collections import deque
 from dataclasses import dataclass, field
 from hashlib import sha256
 import random
+import sys
 from time import perf_counter
+from typing import Callable
 
 from .codec import MessageSegmentEncoder
 from .config import RuntimeConfig
@@ -21,6 +23,7 @@ from .pipeline import prepare_quantized_distribution
 from .progress import ProgressCallback, ProgressSnapshot
 
 STALL_PROGRESS_EPSILON_BITS = 1e-9
+RetryNoticeCallback = Callable[[str], None]
 
 
 @dataclass(frozen=True)
@@ -109,6 +112,7 @@ class StegoEncoder:
         salt: bytes | None = None,
         nonce: bytes | None = None,
         progress_callback: ProgressCallback | None = None,
+        retry_notice_callback: RetryNoticeCallback | None = None,
     ) -> EncodeResult:
         start_time = perf_counter()
         plaintext_bytes = plaintext.encode("utf-8")
@@ -139,6 +143,15 @@ class StegoEncoder:
                 )
             except _LowEntropyWindowTriggered as exc:
                 if attempt_index + 1 < attempts_allowed:
+                    self._emit_retry_notice(
+                        attempt_index=attempt_index + 1,
+                        attempts_allowed=attempts_allowed,
+                        reason=(
+                            "low entropy "
+                            f"({exc.segment_name}, avg={exc.average_entropy_bits:.3f} bits)"
+                        ),
+                        retry_notice_callback=retry_notice_callback,
+                    )
                     continue
                 raise LowEntropyRetryLimitError(
                     "encoding entered a low-entropy regime: "
@@ -149,6 +162,12 @@ class StegoEncoder:
                 ) from exc
             except UnsafeTokenizationError as exc:
                 if attempt_index + 1 < attempts_allowed:
+                    self._emit_retry_notice(
+                        attempt_index=attempt_index + 1,
+                        attempts_allowed=attempts_allowed,
+                        reason="no retokenization-stable candidate path",
+                        retry_notice_callback=retry_notice_callback,
+                    )
                     continue
                 raise UnsafeTokenizationError(
                     "encoding encountered a retokenization-unstable candidate set and "
@@ -281,6 +300,25 @@ class StegoEncoder:
         if not can_retry:
             return "Automatic retry is disabled when both salt and nonce are fixed. " + retry_hint
         return retry_hint
+
+    def _emit_retry_notice(
+        self,
+        *,
+        attempt_index: int,
+        attempts_allowed: int,
+        reason: str,
+        retry_notice_callback: RetryNoticeCallback | None,
+    ) -> None:
+        if retry_notice_callback is not None:
+            retry_notice_callback(
+                f"[retry {attempt_index}/{attempts_allowed}] restarting with fresh packet: {reason}"
+            )
+            return
+        print(
+            f"[hidetext][retry {attempt_index}/{attempts_allowed}] {reason}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def _looks_naturally_finished(self, text: str) -> bool:
         trimmed = text.rstrip()

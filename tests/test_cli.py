@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -155,9 +157,9 @@ class CliTests(unittest.TestCase):
         self.assertIn("tail_tokens", encoded)
         self.assertIn("trailing_tokens", decoded)
 
-    def test_eval_progress_goes_to_stderr(self) -> None:
+    def test_progress_default_on_for_encode(self) -> None:
         completed = self._run_completed(
-            "eval",
+            "encode",
             "--backend",
             "toy",
             "--prompt",
@@ -166,18 +168,32 @@ class CliTests(unittest.TestCase):
             "progress-pass",
             "--message",
             "进度日志可见",
-            "--show-progress",
             "--progress-token-interval",
             "400",
         )
-        payload = json.loads(completed.stdout)
-        self.assertTrue(payload["roundtrip_ok"])
-        self.assertIn("tail_tokens", payload)
-        self.assertIn("decode_trailing_tokens", payload)
+        self.assertTrue(completed.stdout)
         self.assertIn("encode/header", completed.stderr)
         self.assertIn("|", completed.stderr)
         self.assertIn("tok/s", completed.stderr)
         self.assertIn("bpt ", completed.stderr)
+
+    def test_quiet_disables_progress(self) -> None:
+        completed = self._run_completed(
+            "encode",
+            "--backend",
+            "toy",
+            "--prompt",
+            "Write a calm and readable English paragraph.",
+            "--passphrase",
+            "quiet-pass",
+            "--message",
+            "quiet mode works",
+            "--quiet",
+            "--progress-token-interval",
+            "1",
+        )
+        self.assertTrue(completed.stdout)
+        self.assertEqual(completed.stderr, "")
 
     def test_stall_patience_argument_is_accepted(self) -> None:
         payload = self._run(
@@ -225,6 +241,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(args.batch_size, DEFAULT_BATCH_SIZE)
         self.assertEqual(args.top_p, DEFAULT_TOP_P)
         self.assertEqual(args.max_candidates, DEFAULT_MAX_CANDIDATES)
+        self.assertFalse(args.quiet)
         self.assertEqual(cli._resolve_seed(args), DEFAULT_SEED)
 
     def test_default_model_id_is_used_for_cached_default_model(self) -> None:
@@ -265,6 +282,22 @@ class CliTests(unittest.TestCase):
         self.assertIsNone(
             cli._resolve_model_id(args, resolved_model_source="explicit"),
         )
+
+    def test_eval_command_removed(self) -> None:
+        parser = cli._build_parser()
+        with self.assertRaises(SystemExit):
+            with contextlib.redirect_stderr(io.StringIO()):
+                parser.parse_args(
+                    [
+                        "eval",
+                        "--prompt",
+                        "Write a calm and readable English paragraph.",
+                        "--passphrase",
+                        "cli-pass",
+                        "--message",
+                        "CLI roundtrip works.",
+                    ]
+                )
 
 
 if __name__ == "__main__":
