@@ -1,8 +1,8 @@
-# Ghostext-codex 中文说明
+# Ghostext 中文说明
 
 [English README](README.md)
 
-Ghostext 是一个确定性的文本隐写 demo。它会先加密消息，再把密文映射到语言模型生成时的 token 选择里；只要发送端和接收端共享同一模型、prompt、口令和 seed，就可以把消息恢复出来。
+Ghostext 是一个文本隐写 demo。它会先加密消息，再把密文映射到语言模型生成时的 token 选择里；只要发送端和接收端共享同一模型、prompt、口令和 seed，就可以把消息恢复出来。
 
 现在默认的用户路径已经切到真实本地 `llama.cpp` 后端。
 

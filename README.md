@@ -1,8 +1,8 @@
-# Ghostext-codex
+# Ghostext
 
 [中文说明 / Chinese README](README.zh-CN.md)
 
-Ghostext is a deterministic text steganography demo. It encrypts your message first, then hides the ciphertext inside language-model token choices so the same model, prompt, passphrase, and seed can recover it later.
+Ghostext is a text steganography demo. It encrypts your message first, then hides the ciphertext inside language-model token choices so the same model, prompt, passphrase, and seed can recover it later.
 
 The default user path is now the real local `llama.cpp` backend.
 
