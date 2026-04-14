@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
+import sys
+import tempfile
 from typing import Any
 
 import numpy as np
@@ -65,14 +69,13 @@ class QwenLlamaCppBackend:
             raise ModelBackendError(f"model file not found: {model_path}")
 
         n_threads = config.n_threads or max(1, os.cpu_count() or 1)
-        self._llm = Llama(
+        self._llm = _build_llama_with_filtered_stderr(
+            Llama=Llama,
             model_path=str(model_path),
-            n_gpu_layers=0,
             seed=config.seed,
             n_ctx=config.n_ctx,
             n_batch=config.n_batch,
             n_threads=n_threads,
-            logits_all=False,
             use_mmap=config.use_mmap,
             verbose=config.verbose,
         )
@@ -214,6 +217,71 @@ class QwenLlamaCppBackend:
             if len(token_ids) == 1:
                 blocked.add(int(token_ids[0]))
         return blocked
+
+
+def _is_capacity_warning(text: str) -> bool:
+    normalized = text.strip().lower()
+    return bool(
+        re.search(r"llama_context:\s*n_ctx_seq.*<\s*n_ctx_train", normalized)
+        or "full capacity of the model will not be utilized" in normalized
+    )
+
+@contextmanager
+def _redirect_stderr_fd(target_fd: int):
+    saved_fd = os.dup(2)
+    try:
+        os.dup2(target_fd, 2)
+        yield
+    finally:
+        os.dup2(saved_fd, 2)
+        os.close(saved_fd)
+
+
+def _build_llama_with_filtered_stderr(
+    *,
+    Llama,
+    model_path: str,
+    seed: int,
+    n_ctx: int,
+    n_batch: int,
+    n_threads: int,
+    use_mmap: bool,
+    verbose: bool,
+):
+    if verbose:
+        return Llama(
+            model_path=model_path,
+            n_gpu_layers=0,
+            seed=seed,
+            n_ctx=n_ctx,
+            n_batch=n_batch,
+            n_threads=n_threads,
+            logits_all=False,
+            use_mmap=use_mmap,
+            verbose=verbose,
+        )
+
+    with tempfile.TemporaryFile(mode="w+b") as stderr_capture:
+        with _redirect_stderr_fd(stderr_capture.fileno()):
+            llm = Llama(
+                model_path=model_path,
+                n_gpu_layers=0,
+                seed=seed,
+                n_ctx=n_ctx,
+                n_batch=n_batch,
+                n_threads=n_threads,
+                logits_all=False,
+                use_mmap=use_mmap,
+                verbose=verbose,
+            )
+        stderr_capture.seek(0)
+        captured = stderr_capture.read().decode("utf-8", errors="replace")
+
+    for line in captured.splitlines():
+        if _is_capacity_warning(line):
+            continue
+        print(line, file=sys.stderr, flush=True)
+    return llm
 
 
 def build_llama_cpp_tokenizer_hash(

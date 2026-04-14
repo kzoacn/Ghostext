@@ -7,6 +7,7 @@ from unittest import mock
 from ghostext.llama_cpp_backend import (
     QWEN35_PROMPT_TEMPLATE,
     QWEN3_PROMPT_TEMPLATE,
+    _is_capacity_warning,
     _infer_model_id,
     build_llama_cpp_tokenizer_hash,
     resolve_qwen_prompt_template,
@@ -19,6 +20,15 @@ from ghostext.model_assets import (
 
 
 class ModelAssetTests(unittest.TestCase):
+    def test_capacity_warning_matcher_targets_n_ctx_seq_message(self) -> None:
+        self.assertTrue(
+            _is_capacity_warning(
+                "llama_context: n_ctx_seq (4096) < n_ctx_train (262144) -- "
+                "the full capacity of the model will not be utilized"
+            )
+        )
+        self.assertFalse(_is_capacity_warning("llama model loaded successfully"))
+
     def test_explicit_model_path_wins(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             model_path = Path(tmp_dir) / "explicit.gguf"
