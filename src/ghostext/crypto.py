@@ -15,9 +15,9 @@ from .packet import InternalHeader, packet_bootstrap_size, split_packet
 
 KDF_ID_SCRYPT = 1
 AEAD_ID_CHACHA20_POLY1305 = 1
-DERIVATION_CONTEXT = b"hidetext/packet-v2/keys"
-HEADER_AAD = b"hidetext/packet-v2/header"
-BODY_AAD_PREFIX = b"hidetext/packet-v2/body"
+DERIVATION_CONTEXT = b"ghostext/packet-v2/keys"
+HEADER_AAD = b"ghostext/packet-v2/header"
+BODY_AAD_PREFIX = b"ghostext/packet-v2/body"
 
 
 def derive_key(passphrase: str, salt: bytes, crypto_config: CryptoConfig) -> bytes:

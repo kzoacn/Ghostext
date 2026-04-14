@@ -1,8 +1,8 @@
-# HideText-codex
+# Ghostext-codex
 
 [中文说明 / Chinese README](README.zh-CN.md)
 
-HideText is a deterministic text steganography demo. It encrypts your message first, then hides the ciphertext inside language-model token choices so the same model, prompt, passphrase, and seed can recover it later.
+Ghostext is a deterministic text steganography demo. It encrypts your message first, then hides the ciphertext inside language-model token choices so the same model, prompt, passphrase, and seed can recover it later.
 
 The default user path is now the real local `llama.cpp` backend. The toy backend still exists, but it is meant for tests and protocol debugging.
 
@@ -20,11 +20,11 @@ python3 -m venv .venv
 Run a quick encode/decode round-trip check:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
-| .venv/bin/hidetext decode \
+| .venv/bin/ghostext decode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass
 ```
@@ -32,16 +32,16 @@ Run a quick encode/decode round-trip check:
 See all command options:
 
 ```bash
-.venv/bin/hidetext --help
-.venv/bin/hidetext encode --help
-.venv/bin/hidetext decode --help
+.venv/bin/ghostext --help
+.venv/bin/ghostext encode --help
+.venv/bin/ghostext decode --help
 ```
 
-On the first run, HideText will:
+On the first run, Ghostext will:
 
 - look for a local model from `--model-path`
-- otherwise check `HIDETEXT_MODEL_PATH` or `HIDETEXT_LLAMA_MODEL_PATH`
-- otherwise download the default GGUF model to `~/.cache/hidetext/models/qwen35-2b-q4ks/`
+- otherwise check `GHOSTEXT_MODEL_PATH` or `GHOSTEXT_LLAMA_MODEL_PATH`
+- otherwise download the default GGUF model to `~/.cache/ghostext/models/qwen35-2b-q4ks/`
 
 The default model is:
 
@@ -54,7 +54,7 @@ The default model is:
 Most of the time, `encode` only needs these arguments:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --prompt '请写一段自然、连贯、简短的中文段落，描写傍晚散步时看到的街景。' \
   --passphrase 'river-pass' \
   --message '今晚七点在河边老地方见。'
@@ -63,11 +63,11 @@ Most of the time, `encode` only needs these arguments:
 `decode` reads the stego text from stdin by default, so a shell pipe stays short too:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
-| .venv/bin/hidetext decode \
+| .venv/bin/ghostext decode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass
 ```
@@ -75,13 +75,13 @@ Most of the time, `encode` only needs these arguments:
 If you want to keep the generated text:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
   > stego.txt
 
-.venv/bin/hidetext decode \
+.venv/bin/ghostext decode \
   --prompt 'Write a short, natural paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --text-file stego.txt
@@ -117,12 +117,12 @@ These are the values used when you do not override them.
 Use a model you already have:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --model-path /abs/path/to/model.gguf \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
-| .venv/bin/hidetext decode \
+| .venv/bin/ghostext decode \
   --model-path /abs/path/to/model.gguf \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass
@@ -131,13 +131,13 @@ Use a model you already have:
 Change the default download directory:
 
 ```bash
-HIDETEXT_MODEL_DIR=/data/hidetext-models \
-.venv/bin/hidetext encode \
+GHOSTEXT_MODEL_DIR=/data/ghostext-models \
+.venv/bin/ghostext encode \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
   --message 'Meet near the riverside at seven.' \
-| HIDETEXT_MODEL_DIR=/data/hidetext-models \
-  .venv/bin/hidetext decode \
+| GHOSTEXT_MODEL_DIR=/data/ghostext-models \
+  .venv/bin/ghostext decode \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass
 ```
@@ -145,7 +145,7 @@ HIDETEXT_MODEL_DIR=/data/hidetext-models \
 Show structured metadata:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --json \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
@@ -155,7 +155,7 @@ Show structured metadata:
 Disable logs when you want fully quiet output:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --quiet \
   --prompt 'Write a short paragraph about a quiet evening walk.' \
   --passphrase demo-pass \
@@ -167,12 +167,12 @@ Disable logs when you want fully quiet output:
 `ToyCharBackend` is still available, but it is for tests and protocol experiments rather than normal use:
 
 ```bash
-.venv/bin/hidetext encode \
+.venv/bin/ghostext encode \
   --backend toy \
   --prompt 'Write a calm and readable English paragraph.' \
   --passphrase test-pass \
   --message 'toy backend roundtrip' \
-| .venv/bin/hidetext decode \
+| .venv/bin/ghostext decode \
   --backend toy \
   --prompt 'Write a calm and readable English paragraph.' \
   --passphrase test-pass
@@ -189,7 +189,7 @@ env PYTHONPATH=src python3 -m unittest discover -s tests -v
 The real-model smoke test stays opt-in because it needs a local GGUF model:
 
 ```bash
-HIDETEXT_LLAMA_MODEL_PATH=/abs/path/to/model.gguf \
+GHOSTEXT_LLAMA_MODEL_PATH=/abs/path/to/model.gguf \
 env PYTHONPATH=src python3 -m unittest tests.test_llama_cpp_integration -v
 ```
 

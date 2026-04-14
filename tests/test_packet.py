@@ -1,6 +1,6 @@
 import unittest
 
-from hidetext.packet import (
+from ghostext.packet import (
     AEAD_TAG_LEN,
     INTERNAL_HEADER_SIZE,
     InternalHeader,

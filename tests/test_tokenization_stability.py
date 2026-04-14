@@ -2,10 +2,10 @@ import unittest
 
 import numpy as np
 
-from hidetext.candidate_policy import select_candidates
-from hidetext.config import CandidatePolicyConfig
-from hidetext.errors import ModelBackendError, UnsafeTokenizationError
-from hidetext.model_backend import BackendMetadata, RawNextTokenDistribution
+from ghostext.candidate_policy import select_candidates
+from ghostext.config import CandidatePolicyConfig
+from ghostext.errors import ModelBackendError, UnsafeTokenizationError
+from ghostext.model_backend import BackendMetadata, RawNextTokenDistribution
 
 
 class AmbiguousTokenizerBackend:

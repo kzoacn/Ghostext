@@ -8,8 +8,8 @@ import sys
 import tempfile
 import unittest
 
-from hidetext import cli
-from hidetext.model_assets import (
+from ghostext import cli
+from ghostext.model_assets import (
     DEFAULT_BACKEND,
     DEFAULT_BATCH_SIZE,
     DEFAULT_CTX_SIZE,
@@ -32,7 +32,7 @@ class CliTests(unittest.TestCase):
         env = os.environ.copy()
         env["PYTHONPATH"] = str(REPO_ROOT / "src")
         return subprocess.run(
-            [sys.executable, "-m", "hidetext.cli", *args],
+            [sys.executable, "-m", "ghostext.cli", *args],
             cwd=REPO_ROOT,
             env=env,
             check=True,

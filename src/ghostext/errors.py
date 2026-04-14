@@ -1,38 +1,38 @@
-class HideTextError(Exception):
+class GhostextError(Exception):
     """Base class for all project exceptions."""
 
 
-class PacketError(HideTextError):
+class PacketError(GhostextError):
     """Raised when packet framing is invalid."""
 
 
-class ConfigMismatchError(HideTextError):
+class ConfigMismatchError(GhostextError):
     """Raised when runtime configuration does not match the packet."""
 
 
-class IntegrityError(HideTextError):
+class IntegrityError(GhostextError):
     """Raised when authenticated decryption fails."""
 
 
-class SynchronizationError(HideTextError):
+class SynchronizationError(GhostextError):
     """Raised when the observed text diverges from the expected protocol path."""
 
 
-class EncodingExhaustedError(HideTextError):
+class EncodingExhaustedError(GhostextError):
     """Raised when encoding cannot finish within the configured token budget."""
 
 
-class StallDetectedError(HideTextError):
+class StallDetectedError(GhostextError):
     """Raised when encoding stops making forward bit progress for too long."""
 
 
-class LowEntropyRetryLimitError(HideTextError):
+class LowEntropyRetryLimitError(GhostextError):
     """Raised when repeated encoding attempts all fall into a low-entropy regime."""
 
 
-class UnsafeTokenizationError(HideTextError):
+class UnsafeTokenizationError(GhostextError):
     """Raised when every candidate would retokenize into a different token path."""
 
 
-class ModelBackendError(HideTextError):
+class ModelBackendError(GhostextError):
     """Raised when the backend cannot provide or parse tokens."""

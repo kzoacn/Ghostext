@@ -1,10 +1,10 @@
 import unittest
 
-from hidetext.codec import MessageSegmentDecoder, MessageSegmentEncoder
-from hidetext.model_backend import TokenProb
-from hidetext.candidate_policy import select_candidates
-from hidetext.config import CandidatePolicyConfig
-from hidetext.quantization import quantize_candidates
+from ghostext.codec import MessageSegmentDecoder, MessageSegmentEncoder
+from ghostext.model_backend import TokenProb
+from ghostext.candidate_policy import select_candidates
+from ghostext.config import CandidatePolicyConfig
+from ghostext.quantization import quantize_candidates
 
 
 def make_quantized(distribution: list[tuple[str, int, float]]):

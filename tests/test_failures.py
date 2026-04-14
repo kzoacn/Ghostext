@@ -3,17 +3,17 @@ from unittest import mock
 
 import numpy as np
 
-from hidetext.config import CandidatePolicyConfig, CodecConfig, RuntimeConfig
-from hidetext.decoder import StegoDecoder
-from hidetext.encoder import SegmentStats, StegoEncoder
-from hidetext.errors import (
-    HideTextError,
+from ghostext.config import CandidatePolicyConfig, CodecConfig, RuntimeConfig
+from ghostext.decoder import StegoDecoder
+from ghostext.encoder import SegmentStats, StegoEncoder
+from ghostext.errors import (
+    GhostextError,
     LowEntropyRetryLimitError,
     StallDetectedError,
     UnsafeTokenizationError,
 )
-from hidetext.model_backend import BackendMetadata, RawNextTokenDistribution, ToyCharBackend
-from hidetext.packet import packet_bootstrap_size
+from ghostext.model_backend import BackendMetadata, RawNextTokenDistribution, ToyCharBackend
+from ghostext.packet import packet_bootstrap_size
 
 
 class RetrySensitiveBackend:
@@ -83,7 +83,7 @@ class FailureTests(unittest.TestCase):
 
     def test_wrong_seed_fails_closed(self) -> None:
         wrong_config = RuntimeConfig(seed=8)
-        with self.assertRaises(HideTextError):
+        with self.assertRaises(GhostextError):
             StegoDecoder(self.backend, wrong_config).decode(
                 self.encoded.text,
                 passphrase=self.passphrase,
@@ -91,7 +91,7 @@ class FailureTests(unittest.TestCase):
             )
 
     def test_wrong_prompt_fails(self) -> None:
-        with self.assertRaises(HideTextError):
+        with self.assertRaises(GhostextError):
             StegoDecoder(self.backend, self.config).decode(
                 self.encoded.text,
                 passphrase=self.passphrase,
@@ -106,7 +106,7 @@ class FailureTests(unittest.TestCase):
             else "，"
         )
         mutated = mutated_packet_text + self.encoded.text[self.encoded.packet_tokens :]
-        with self.assertRaises(HideTextError):
+        with self.assertRaises(GhostextError):
             StegoDecoder(self.backend, self.config).decode(
                 mutated,
                 passphrase=self.passphrase,
@@ -225,7 +225,7 @@ class FailureTests(unittest.TestCase):
         first_packet = (b"H" * bootstrap_len) + b"\x00"
         second_packet = (b"H" * bootstrap_len) + b"\x80"
         with mock.patch(
-            "hidetext.encoder.build_packet",
+            "ghostext.encoder.build_packet",
             side_effect=[first_packet, second_packet],
         ) as build_packet_mock:
             result = StegoEncoder(backend, config).encode(
@@ -259,7 +259,7 @@ class FailureTests(unittest.TestCase):
         )
         failing_packet = (b"H" * packet_bootstrap_size(16, 12)) + b"\x00"
         with mock.patch(
-            "hidetext.encoder.build_packet",
+            "ghostext.encoder.build_packet",
             side_effect=[failing_packet, failing_packet, failing_packet],
         ) as build_packet_mock:
             with self.assertRaises(LowEntropyRetryLimitError) as ctx:
@@ -286,7 +286,7 @@ class FailureTests(unittest.TestCase):
         first_packet = (b"H" * bootstrap_len) + b"\x00"
         second_packet = (b"H" * bootstrap_len) + b"\x01"
         with mock.patch(
-            "hidetext.encoder.build_packet",
+            "ghostext.encoder.build_packet",
             side_effect=[first_packet, second_packet],
         ) as build_packet_mock:
             with mock.patch.object(
@@ -323,7 +323,7 @@ class FailureTests(unittest.TestCase):
             (b"H" * packet_bootstrap_size(16, 12)) + b"\x02",
         ]
         with mock.patch(
-            "hidetext.encoder.build_packet",
+            "ghostext.encoder.build_packet",
             side_effect=packets,
         ) as build_packet_mock:
             with mock.patch.object(

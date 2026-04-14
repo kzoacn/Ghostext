@@ -1,4 +1,4 @@
-# HideText Agent Guide
+# Ghostext Agent Guide
 
 ## Project Mission
 

@@ -1,9 +1,9 @@
 import unittest
 
-from hidetext.config import RuntimeConfig
-from hidetext.decoder import StegoDecoder
-from hidetext.encoder import StegoEncoder
-from hidetext.model_backend import ToyCharBackend
+from ghostext.config import RuntimeConfig
+from ghostext.decoder import StegoDecoder
+from ghostext.encoder import StegoEncoder
+from ghostext.model_backend import ToyCharBackend
 
 
 class RoundTripEnTests(unittest.TestCase):

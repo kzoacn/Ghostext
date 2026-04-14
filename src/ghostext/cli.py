@@ -35,9 +35,9 @@ from .progress import ProgressSnapshot
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="hidetext",
+        prog="ghostext",
         description=(
-            "HideText CLI: encode encrypted payloads into generated text and decode them back "
+            "Ghostext CLI: encode encrypted payloads into generated text and decode them back "
             "with the same model/prompt/passphrase/seed."
         ),
     )
@@ -80,7 +80,7 @@ def _build_parser() -> argparse.ArgumentParser:
         )
         subparser.add_argument(
             "--model-path",
-            help="optional GGUF path; otherwise HideText reuses or downloads the default model",
+            help="optional GGUF path; otherwise Ghostext reuses or downloads the default model",
         )
         subparser.add_argument(
             "--model-id",
@@ -262,7 +262,7 @@ def _build_backend(args: argparse.Namespace, *, seed: int):
             import llama_cpp  # noqa: F401
         except ImportError as exc:
             raise ModelBackendError(
-                "llama-cpp backend requires llama-cpp-python; install hidetext[llm]"
+                "llama-cpp backend requires llama-cpp-python; install ghostext[llm]"
             ) from exc
         if not args.model_path:
             resolved_model = resolve_default_model_path()
@@ -272,7 +272,7 @@ def _build_backend(args: argparse.Namespace, *, seed: int):
 
         if resolved_model.source == "downloaded":
             print(
-                f"[hidetext] downloaded default model to {resolved_model.path}",
+                f"[ghostext] downloaded default model to {resolved_model.path}",
                 file=sys.stderr,
                 flush=True,
             )

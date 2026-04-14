@@ -37,10 +37,10 @@ class ResolvedModelPath:
 
 
 def default_model_cache_dir() -> Path:
-    override = os.environ.get("HIDETEXT_MODEL_DIR")
+    override = os.environ.get("GHOSTEXT_MODEL_DIR")
     if override:
         return Path(override).expanduser()
-    return Path.home() / ".cache" / "hidetext" / "models" / DEFAULT_MODEL_CACHE_SUBDIR
+    return Path.home() / ".cache" / "ghostext" / "models" / DEFAULT_MODEL_CACHE_SUBDIR
 
 
 def resolve_default_model_path(explicit_path: str | None = None) -> ResolvedModelPath:
@@ -50,7 +50,7 @@ def resolve_default_model_path(explicit_path: str | None = None) -> ResolvedMode
             raise ModelBackendError(f"model file not found: {path}")
         return ResolvedModelPath(path=path, source="explicit")
 
-    for env_var in ("HIDETEXT_MODEL_PATH", "HIDETEXT_LLAMA_MODEL_PATH"):
+    for env_var in ("GHOSTEXT_MODEL_PATH", "GHOSTEXT_LLAMA_MODEL_PATH"):
         env_value = os.environ.get(env_var)
         if env_value is None:
             continue
@@ -73,7 +73,7 @@ def _download_default_model(cache_dir: Path) -> Path:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
         raise ModelBackendError(
-            "automatic model download requires huggingface_hub; install hidetext[llm]"
+            "automatic model download requires huggingface_hub; install ghostext[llm]"
         ) from exc
 
     cache_dir.mkdir(parents=True, exist_ok=True)

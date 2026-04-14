@@ -4,14 +4,14 @@ import tempfile
 import unittest
 from unittest import mock
 
-from hidetext.llama_cpp_backend import (
+from ghostext.llama_cpp_backend import (
     QWEN35_PROMPT_TEMPLATE,
     QWEN3_PROMPT_TEMPLATE,
     _infer_model_id,
     build_llama_cpp_tokenizer_hash,
     resolve_qwen_prompt_template,
 )
-from hidetext.model_assets import (
+from ghostext.model_assets import (
     DEFAULT_MODEL_FILENAME,
     ResolvedModelPath,
     resolve_default_model_path,
@@ -36,7 +36,7 @@ class ModelAssetTests(unittest.TestCase):
             cache_dir = Path(tmp_dir)
             cached_model = cache_dir / DEFAULT_MODEL_FILENAME
             cached_model.write_bytes(b"cached-gguf")
-            with mock.patch.dict(os.environ, {"HIDETEXT_MODEL_DIR": str(cache_dir)}, clear=True):
+            with mock.patch.dict(os.environ, {"GHOSTEXT_MODEL_DIR": str(cache_dir)}, clear=True):
                 resolved = resolve_default_model_path()
 
             self.assertEqual(resolved.path, cached_model)
@@ -46,9 +46,9 @@ class ModelAssetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             cache_dir = Path(tmp_dir)
             downloaded_path = cache_dir / DEFAULT_MODEL_FILENAME
-            with mock.patch.dict(os.environ, {"HIDETEXT_MODEL_DIR": str(cache_dir)}, clear=True):
+            with mock.patch.dict(os.environ, {"GHOSTEXT_MODEL_DIR": str(cache_dir)}, clear=True):
                 with mock.patch(
-                    "hidetext.model_assets._download_default_model",
+                    "ghostext.model_assets._download_default_model",
                     return_value=downloaded_path,
                 ) as download_mock:
                     resolved = resolve_default_model_path()

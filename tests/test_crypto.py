@@ -1,10 +1,10 @@
 import unittest
 
-from hidetext.config import RuntimeConfig
-from hidetext.crypto import build_packet, decrypt_bootstrap_header, decrypt_packet
-from hidetext.errors import ConfigMismatchError, IntegrityError
-from hidetext.model_backend import ToyCharBackend
-from hidetext.packet import packet_bootstrap_size
+from ghostext.config import RuntimeConfig
+from ghostext.crypto import build_packet, decrypt_bootstrap_header, decrypt_packet
+from ghostext.errors import ConfigMismatchError, IntegrityError
+from ghostext.model_backend import ToyCharBackend
+from ghostext.packet import packet_bootstrap_size
 
 
 class CryptoTests(unittest.TestCase):

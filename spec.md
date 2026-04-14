@@ -1,8 +1,8 @@
-# HideText 规格说明
+# Ghostext 规格说明
 
 ## 1. 项目目标
 
-HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 demo。它的核心目标是：
+Ghostext 是一个基于大模型 next-token 分布的自然语言隐写工程 demo。它的核心目标是：
 
 - 把一段秘密消息嵌入到自然语言生成过程中，而不是事后修改文本。
 - 利用语言模型每一步给出的离散分布作为信道。
@@ -120,7 +120,7 @@ HideText 是一个基于大模型 next-token 分布的自然语言隐写工程 d
 - `model_id = Qwen/Qwen3.5-2B`
 - GGUF 来源：`bartowski/Qwen_Qwen3.5-2B-GGUF`
 - 默认文件：`Qwen_Qwen3.5-2B-Q4_K_S.gguf`
-- 默认缓存目录：`~/.cache/hidetext/models/qwen35-2b-q4ks/`
+- 默认缓存目录：`~/.cache/ghostext/models/qwen35-2b-q4ks/`
 
 对于不同模型家族，backend 还必须固定对应的 `prompt_template_id`。例如：
 
@@ -535,7 +535,7 @@ max_encode_attempts = 10
 第一版建议采用如下结构：
 
 ```text
-src/hidetext/
+src/ghostext/
   config.py
   packet.py
   crypto.py
@@ -606,4 +606,4 @@ tests/
 
 ## 23. 一句话总结
 
-HideText 的第一版不是在追求“最隐蔽”或“最大容量”，而是在追求一个可稳定复现、可中英文演示、基于本地小模型的 next-token 分布隐写工程 demo。凡是和这个目标冲突的优化，默认都应让位于可解码性与确定性。
+Ghostext 的第一版不是在追求“最隐蔽”或“最大容量”，而是在追求一个可稳定复现、可中英文演示、基于本地小模型的 next-token 分布隐写工程 demo。凡是和这个目标冲突的优化，默认都应让位于可解码性与确定性。

@@ -315,7 +315,7 @@ class StegoEncoder:
             )
             return
         print(
-            f"[hidetext][retry {attempt_index}/{attempts_allowed}] {reason}",
+            f"[ghostext][retry {attempt_index}/{attempts_allowed}] {reason}",
             file=sys.stderr,
             flush=True,
         )

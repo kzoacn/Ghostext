@@ -56,7 +56,7 @@ class QwenLlamaCppBackend:
             from llama_cpp import Llama
         except ImportError as exc:
             raise ModelBackendError(
-                "llama-cpp backend requires llama-cpp-python; install hidetext[llm]"
+                "llama-cpp backend requires llama-cpp-python; install ghostext[llm]"
             ) from exc
 
         self.config = config

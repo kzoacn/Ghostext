@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hidetext"
+name = "ghostext"
 version = "0.1.0"
 description = "Deterministic text steganography demo driven by next-token distributions"
 readme = "README.md"
@@ -21,7 +21,7 @@ llm = [
 ]
 
 [project.scripts]
-hidetext = "hidetext.cli:main"
+ghostext = "ghostext.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

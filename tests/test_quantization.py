@@ -1,9 +1,9 @@
 import unittest
 
-from hidetext.candidate_policy import select_candidates
-from hidetext.config import CandidatePolicyConfig
-from hidetext.model_backend import TokenProb
-from hidetext.quantization import quantize_candidates
+from ghostext.candidate_policy import select_candidates
+from ghostext.config import CandidatePolicyConfig
+from ghostext.model_backend import TokenProb
+from ghostext.quantization import quantize_candidates
 
 
 class QuantizationTests(unittest.TestCase):
