@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ghostext"
-version = "0.1.1"
+version = "0.1.2"
 description = "Text steganography demo driven by next-token distributions"
 readme = "README.md"
 requires-python = ">=3.12"
