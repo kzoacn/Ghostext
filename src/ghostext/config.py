@@ -16,15 +16,26 @@ class CandidatePolicyConfig:
     max_candidates: int = 16
     min_entropy_bits: float = 1.0
     enforce_retokenization_stability: bool = True
+    empty_candidate_search: int = 0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.empty_candidate_search, int) or self.empty_candidate_search < 0:
+            raise ValueError("empty_candidate_search must be a nonnegative integer")
+        if self.empty_candidate_search and self.empty_candidate_search < self.max_candidates:
+            raise ValueError("empty_candidate_search must be zero or at least max_candidates")
 
     def as_protocol_dict(self) -> dict[str, object]:
-        return {
+        values = {
             "version": CANDIDATE_POLICY_VERSION,
             "top_p": self.top_p,
             "max_candidates": self.max_candidates,
             "min_entropy_bits": self.min_entropy_bits,
             "enforce_retokenization_stability": self.enforce_retokenization_stability,
         }
+        if self.empty_candidate_search:
+            values["version"] = "top-p-maxk-retoken-stable-expand-v3"
+            values["empty_candidate_search"] = self.empty_candidate_search
+        return values
 
 
 @dataclass(frozen=True)

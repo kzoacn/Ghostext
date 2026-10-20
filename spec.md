@@ -42,6 +42,24 @@ It is not emitted to a user or network by default. Experiment collectors must
 keep failed attempts and distinguish total delivery success from first-attempt
 success; retry count is not a feature available to a text-only adversary.
 
+### Optional bounded search after an empty stable set
+
+`CandidatePolicyConfig.empty_candidate_search=0` preserves the historical
+candidate policy and its fingerprint exactly. A positive limit at least as large
+as `max_candidates` selects `top-p-maxk-retoken-stable-expand-v3`, binding the
+limit into the fingerprint. If the ordinary truncated set has any stable token,
+selection is unchanged. Otherwise, form a rank-ordered pool up to the specified
+limit with `top_p=1`, scan it for stable tokens, and retain at most the original
+`max_candidates` stable entries, in order. Renormalize those probabilities and
+apply the existing entropy gate and quantizer. Failure remains explicit if this
+bounded pool has no stable entry. Both endpoints execute the same rule.
+
+This optional policy prevents some avoidable empty-set failures by changing the
+source distribution; it is not a distribution-preserving repair. Candidate audits
+mark `fallback_used`. In that case their removed mass includes both instability
+and the final cap on stable candidates, relative to the expanded prefilter pool.
+Historical cohorts and strict-policy experiments do not enable this option.
+
 ## 1. 项目目标
 
 Ghostext 是一个基于大模型 next-token 分布的自然语言隐写工程 demo。它的核心目标是：

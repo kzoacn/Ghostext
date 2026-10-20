@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import numpy as np
 
@@ -26,6 +26,7 @@ class CandidateAudit:
     stable_selection: CandidateSelection
     truncated_tail_mass: float
     stability_removed_mass: float
+    fallback_used: bool = False
 
 
 def audit_candidate_selection(
@@ -39,28 +40,31 @@ def audit_candidate_selection(
     """Observe the actual policy without changing token-selection rules.
 
     Masses are measured before integer quantization, relative to the backend's
-    already masked distribution and then its truncated distribution.
+    already masked distribution and then its truncated distribution. When
+    fallback_used, stability_removed_mass also includes the final stable-token
+    cap: it is the total mass discarded after the expanded prefilter pool.
     """
     if isinstance(distribution, RawNextTokenDistribution):
         if backend is None:
             raise ValueError("backend is required for raw distributions")
         prefilter = _select_from_raw_distribution(distribution, config, backend=backend)
-        selected_ids = {entry.token_id for entry in prefilter.entries}
+    else:
+        prefilter = _select_from_probs(distribution, config)
+    prefilter, stable, fallback = _finish_selection(
+        distribution, prefilter, config, backend=backend, prompt=prompt,
+        generated_token_ids=generated_token_ids,
+    )
+    selected_ids = {entry.token_id for entry in prefilter.entries}
+    if isinstance(distribution, RawNextTokenDistribution):
         token_ids = np.asarray(distribution.token_ids)
         logits = np.asarray(distribution.logits, dtype=np.float64)
         mask = np.isin(token_ids, list(selected_ids))
         retained_mass = float(np.exp(logits[mask] - _logsumexp(logits)).sum())
     else:
-        prefilter = _select_from_probs(distribution, config)
-        selected_ids = {entry.token_id for entry in prefilter.entries}
         total = sum(entry.probability for entry in distribution)
         retained_mass = sum(
             entry.probability for entry in distribution if entry.token_id in selected_ids
         ) / total
-    stable = _enforce_retokenization_stability(
-        prefilter, config, backend=backend, prompt=prompt,
-        generated_token_ids=generated_token_ids,
-    )
     stable_ids = {entry.token_id for entry in stable.entries}
     removed_mass = sum(
         entry.probability for entry in prefilter.entries if entry.token_id not in stable_ids
@@ -70,6 +74,7 @@ def audit_candidate_selection(
         stable_selection=stable,
         truncated_tail_mass=max(0.0, min(1.0, 1.0 - retained_mass)),
         stability_removed_mass=removed_mass,
+        fallback_used=fallback,
     )
 
 
@@ -88,13 +93,35 @@ def select_candidates(
         selection = _select_from_raw_distribution(distribution, config, backend=backend)
     else:
         selection = _select_from_probs(distribution, config)
-    return _enforce_retokenization_stability(
-        selection,
-        config,
-        backend=backend,
-        prompt=prompt,
+    return _finish_selection(
+        distribution, selection, config, backend=backend, prompt=prompt,
         generated_token_ids=generated_token_ids,
+    )[1]
+
+
+def _finish_selection(distribution, selection, config, *, backend, prompt, generated_token_ids):
+    try:
+        stable = _enforce_retokenization_stability(
+            selection, config, backend=backend, prompt=prompt,
+            generated_token_ids=generated_token_ids,
+        )
+        return selection, stable, False
+    except UnsafeTokenizationError:
+        if config.empty_candidate_search <= config.max_candidates:
+            raise
+    # This optional versioned policy changes the source only when the original
+    # truncated set has no stable token. Scan a bounded larger rank-ordered
+    # pool, ignoring top_p in this fallback, and retain at most max_candidates.
+    expanded = replace(config, top_p=1.0, max_candidates=config.empty_candidate_search)
+    if isinstance(distribution, RawNextTokenDistribution):
+        pool = _select_from_raw_distribution(distribution, expanded, backend=backend)
+    else:
+        pool = _select_from_probs(distribution, expanded)
+    stable = _enforce_retokenization_stability(
+        pool, config, backend=backend, prompt=prompt, generated_token_ids=generated_token_ids,
+        retain_limit=config.max_candidates,
     )
+    return pool, stable, True
 
 
 def _select_from_probs(
@@ -226,22 +253,24 @@ def _enforce_retokenization_stability(
     backend: TextBackend | None,
     prompt: str | None,
     generated_token_ids: list[int] | None,
+    retain_limit: int | None = None,
 ) -> CandidateSelection:
     if not config.enforce_retokenization_stability:
         return selection
     if backend is None or prompt is None or generated_token_ids is None:
         return selection
 
-    stable_entries = [
-        entry
-        for entry in selection.entries
+    stable_entries = []
+    for entry in selection.entries:
         if _is_retokenization_stable(
             backend,
             prompt=prompt,
             generated_token_ids=generated_token_ids,
             token_id=entry.token_id,
-        )
-    ]
+        ):
+            stable_entries.append(entry)
+            if retain_limit is not None and len(stable_entries) >= retain_limit:
+                break
     if not stable_entries:
         raise UnsafeTokenizationError(
             "candidate selection contains no retokenization-stable token"

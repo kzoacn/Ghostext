@@ -11,6 +11,11 @@ bias in the historical codec. Both endpoints must use the same revision and
 `--guard-bits` setting (default 128). `--guard-bits 0` selects the historical
 codec for controlled comparisons. This change does not establish resistance
 to text detectors, length analysis, or observation of retry behavior.
+
+An experimental `--empty-candidate-search 4096` option searches a larger
+rank-ordered pool only when the original pool has no stable token. Both
+endpoints must enable the same value. It changes the candidate source and is
+disabled by default; the strict-policy historical results do not include it.
  
 ![Ghostext demo](imgs/demo.png)
 

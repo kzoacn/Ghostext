@@ -115,6 +115,10 @@ def _build_parser() -> argparse.ArgumentParser:
             help="candidate cap per decoding step",
         )
         subparser.add_argument(
+            "--empty-candidate-search", type=int, default=0,
+            help="optional larger rank pool when no stable candidate remains (0 disables)",
+        )
+        subparser.add_argument(
             "--min-entropy-bits",
             type=float,
             default=DEFAULT_MIN_ENTROPY_BITS,
@@ -272,6 +276,7 @@ def _config_from_args(args: argparse.Namespace, *, seed: int) -> RuntimeConfig:
             top_p=args.top_p,
             max_candidates=args.max_candidates,
             min_entropy_bits=args.min_entropy_bits,
+            empty_candidate_search=args.empty_candidate_search,
         ),
         codec=CodecConfig(
             total_frequency=args.totfreq,
