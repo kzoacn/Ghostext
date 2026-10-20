@@ -297,6 +297,7 @@ def summarize_subset(rows: list[dict[str, Any]]) -> dict[str, Any]:
     decode_lat = [item["decode_wall_seconds"] for item in success]
     e2e_lat = [item["e2e_elapsed_seconds"] for item in success]
     bits_per_token = [item["bits_per_token_encode"] for item in success]
+    net_bits_per_token = [8 * item["plaintext_bytes"] / item["total_tokens"] for item in success]
     packet_bytes = [item["packet_len"] for item in success]
     total_tokens = [item["total_tokens"] for item in success]
     encode_tps = [item["encode_tokens_per_second"] for item in success]
@@ -314,6 +315,7 @@ def summarize_subset(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "decode_latency_seconds": summarize_float(decode_lat),
         "end_to_end_latency_seconds": summarize_float(e2e_lat),
         "bits_per_token_encode": summarize_float(bits_per_token),
+        "net_plaintext_bits_per_token": summarize_float(net_bits_per_token),
         "packet_len_bytes": summarize_float(packet_bytes),
         "total_tokens": summarize_float(total_tokens),
         "encode_tokens_per_second": summarize_float(encode_tps),
@@ -472,6 +474,7 @@ def main() -> int:
     parser.add_argument("--max-candidates", type=int, default=64)
     parser.add_argument("--min-entropy-bits", type=float, default=0.0)
     parser.add_argument("--total-frequency", type=int, default=4096)
+    parser.add_argument("--guard-bits", type=int, default=128)
     parser.add_argument("--header-token-budget", type=int, default=2048)
     parser.add_argument("--body-token-budget", type=int, default=4096)
     parser.add_argument("--natural-tail-max-tokens", type=int, default=64)
@@ -527,6 +530,7 @@ def main() -> int:
         ),
         codec=CodecConfig(
             total_frequency=args.total_frequency,
+            guard_bits=args.guard_bits,
             max_header_tokens=args.header_token_budget,
             max_body_tokens=args.body_token_budget,
             natural_tail_max_tokens=args.natural_tail_max_tokens,
@@ -540,6 +544,23 @@ def main() -> int:
     decoder = StegoDecoder(backend, config)
 
     existing_runs = load_existing_runs(runs_path)
+    run_manifest_path = out_dir / "run_manifest.json"
+    run_manifest = {
+        "runtime_config": json.loads(config.to_json()),
+        "backend_metadata": backend.metadata.as_dict(),
+        "source_sha256": {
+            p.name: sha256_hex(p.read_bytes())
+            for p in sorted((GHOSTEXT_ROOT / "src/ghostext").glob("*.py"))
+        },
+        "threads": args.threads, "ctx_size": args.ctx_size, "batch_size": args.batch_size,
+    }
+    if run_manifest_path.exists():
+        if json.loads(run_manifest_path.read_text()) != run_manifest:
+            raise ValueError("Source or configuration changed; use a new output directory")
+    elif existing_runs:
+        raise ValueError("Historical results have no resume manifest; use a new output directory")
+    else:
+        run_manifest_path.write_text(json.dumps(run_manifest, indent=2) + "\n")
     completed_pair_ids = {item["pair_id"] for item in existing_runs}
     all_runs = list(existing_runs)
     trial_pairs = [(prompt, message) for prompt in prompts for message in messages]
@@ -596,6 +617,9 @@ def main() -> int:
                         "decode_consumed_tokens": dec.consumed_tokens,
                         "decode_trailing_tokens": dec.trailing_tokens,
                         "bits_per_token_encode": enc.bits_per_token,
+                        "net_plaintext_bits_per_token": (
+                            8 * len(message_case.message.encode("utf-8")) / enc.total_tokens
+                        ),
                         "bits_per_token_decode": dec.bits_per_token,
                         "encode_tokens_per_second": enc.tokens_per_second,
                         "decode_tokens_per_second": dec.tokens_per_second,
@@ -672,6 +696,7 @@ def main() -> int:
             },
             "codec": {
                 "total_frequency": args.total_frequency,
+                "guard_bits": args.guard_bits,
                 "header_token_budget": args.header_token_budget,
                 "body_token_budget": args.body_token_budget,
                 "natural_tail_max_tokens": args.natural_tail_max_tokens,

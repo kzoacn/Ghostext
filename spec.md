@@ -1,5 +1,39 @@
 # Ghostext 规格说明
 
+## S&P 2027 revision: guarded-prefix-v2
+
+The 2026-10-20 revision changes the interval codec, without changing the packet
+byte format. `CodecConfig.guard_bits=128` is the new default and is included in
+the configuration fingerprint. `guard_bits=0` explicitly selects the historical
+`finite-interval-v1` codec and preserves its old fingerprint for experiments.
+Old and new senders/receivers must agree on this parameter.
+
+For an n-byte segment and g guard bits, the sender draws an independent uniform
+g-bit suffix r and selects target `z = (Int(segment) << g) | r` in the domain
+`[0, 2^(8n+g))`. The receiver uses the same domain but does not need r. Both
+perform the existing integer-CDF interval updates and stop once
+`low >> g == (high - 1) >> g`. The receiver outputs the common n-byte prefix.
+For g=0 this is the old width-one stopping rule. Empty segments finish
+immediately. Guard randomness is generated with the operating system's secure
+random source; it is independent for each segment and encoding attempt.
+
+This change addresses the historical codec's terminal support collapse.
+Even if f/F matches the candidate distribution exactly, sampling a finite
+integer interval of width W selects token i with probability
+`(floor(W*cdf_hi/F)-floor(W*cdf_lo/F))/W`, which may differ greatly from f_i/F
+when W is small. Guarding lets decoding finish while many suffix values remain.
+This is not a claim of full-text indistinguishability: truncation, tokenization
+filtering, greedy entropy gating, successful-retry conditioning, and stopping/
+tail policies still need separate analysis. `interval_rounding_tv` computes the
+exact conditional TV of the codec against f/F under a uniform interval source.
+Ciphertext uniformity is an assumption for this diagnostic, not a consequence
+of authentication alone.
+
+Metrics distinguish gross packet bits/token (includes the fixed 88-byte
+framing overhead) from net plaintext bits/token. Both divide by all transmitted
+tokens, including the natural tail. Runtime reports must include unsuccessful
+attempts. Historical unguarded measurements remain historical.
+
 ## 1. 项目目标
 
 Ghostext 是一个基于大模型 next-token 分布的自然语言隐写工程 demo。它的核心目标是：

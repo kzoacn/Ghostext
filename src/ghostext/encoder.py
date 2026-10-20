@@ -343,7 +343,7 @@ class StegoEncoder:
         progress_callback: ProgressCallback | None,
         low_entropy_window: _LowEntropyWindow,
     ) -> SegmentStats:
-        encoder = MessageSegmentEncoder(payload)
+        encoder = MessageSegmentEncoder(payload, guard_bits=self.config.codec.guard_bits)
         steps = 0
         encoding_steps = 0
         embedded_bits = 0.0

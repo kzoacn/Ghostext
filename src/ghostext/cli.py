@@ -127,6 +127,10 @@ def _build_parser() -> argparse.ArgumentParser:
             help="integer total frequency for quantization",
         )
         subparser.add_argument(
+            "--guard-bits", type=int, default=128,
+            help="random suffix precision; 0 selects the historical codec for comparisons",
+        )
+        subparser.add_argument(
             "--header-token-budget",
             type=int,
             default=DEFAULT_HEADER_TOKEN_BUDGET,
@@ -271,6 +275,7 @@ def _config_from_args(args: argparse.Namespace, *, seed: int) -> RuntimeConfig:
         ),
         codec=CodecConfig(
             total_frequency=args.totfreq,
+            guard_bits=args.guard_bits,
             max_header_tokens=args.header_token_budget,
             max_body_tokens=args.body_token_budget,
             natural_tail_max_tokens=args.natural_tail_max_tokens,

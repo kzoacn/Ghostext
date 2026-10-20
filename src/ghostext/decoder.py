@@ -151,7 +151,7 @@ class StegoDecoder:
         start_time: float,
         progress_callback: ProgressCallback | None,
     ) -> tuple[bytes, int]:
-        decoder = MessageSegmentDecoder(payload_len)
+        decoder = MessageSegmentDecoder(payload_len, guard_bits=self.config.codec.guard_bits)
         steps = 0
         while not decoder.finished:
             if steps >= max_tokens:

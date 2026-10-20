@@ -6,7 +6,7 @@ import json
 
 
 PROTOCOL_VERSION = 1
-CODEC_VERSION = "finite-interval-v1"
+CODEC_VERSION = "guarded-prefix-v2"
 CANDIDATE_POLICY_VERSION = "top-p-maxk-retoken-stable-v2"
 
 
@@ -30,6 +30,7 @@ class CandidatePolicyConfig:
 @dataclass(frozen=True)
 class CodecConfig:
     total_frequency: int = 65536
+    guard_bits: int = 128
     max_header_tokens: int = 2048
     max_body_tokens: int = 4096
     natural_tail_max_tokens: int = 64
@@ -38,10 +39,22 @@ class CodecConfig:
     low_entropy_threshold_bits: float = 0.1
     max_encode_attempts: int = 10
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.guard_bits, int) or self.guard_bits < 0:
+            raise ValueError("guard_bits must be a nonnegative integer")
+
     def as_protocol_dict(self) -> dict[str, object]:
+        # Preserve the historical fingerprint only when explicitly selecting
+        # the vulnerable finite-message codec for controlled comparisons.
+        if self.guard_bits == 0:
+            return {
+                "version": "finite-interval-v1",
+                "total_frequency": self.total_frequency,
+            }
         return {
             "version": CODEC_VERSION,
             "total_frequency": self.total_frequency,
+            "guard_bits": self.guard_bits,
         }
 
 

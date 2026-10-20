@@ -3,6 +3,14 @@
 [中文说明 / Chinese README](README.zh-CN.md)
 
 Ghostext is a text steganography demo. It encrypts your message first, then hides the ciphertext inside language-model token choices so the same model, prompt, passphrase, and seed can recover it later.
+
+The S&P 2027 research revision uses `guarded-prefix-v2`: independent random
+suffix bits let the decoder recover a packet segment before its integer
+interval collapses to a point. This addresses a measurable terminal sampling
+bias in the historical codec. Both endpoints must use the same revision and
+`--guard-bits` setting (default 128). `--guard-bits 0` selects the historical
+codec for controlled comparisons. This change does not establish resistance
+to text detectors, length analysis, or observation of retry behavior.
  
 ![Ghostext demo](imgs/demo.png)
 
@@ -97,6 +105,7 @@ The CLI now comes with a real-model preset so users usually do not need to care 
 - `--max-candidates`
 - `--min-entropy-bits`
 - `--totfreq`
+- `--guard-bits`
 
 The current default preset is:
 
@@ -108,6 +117,7 @@ The current default preset is:
 - max candidates: `64`
 - min entropy bits: `0.0`
 - total frequency: `4096`
+- guard bits: `128`
 
 These are the values used when you do not override them.
 

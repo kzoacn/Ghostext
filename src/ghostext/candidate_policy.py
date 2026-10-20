@@ -20,6 +20,59 @@ class CandidateSelection:
         return self.entries[0]
 
 
+@dataclass(frozen=True)
+class CandidateAudit:
+    prefilter_selection: CandidateSelection
+    stable_selection: CandidateSelection
+    truncated_tail_mass: float
+    stability_removed_mass: float
+
+
+def audit_candidate_selection(
+    distribution: list[TokenProb] | RawNextTokenDistribution,
+    config: CandidatePolicyConfig,
+    *,
+    backend: TextBackend | None = None,
+    prompt: str | None = None,
+    generated_token_ids: list[int] | None = None,
+) -> CandidateAudit:
+    """Observe the actual policy without changing token-selection rules.
+
+    Masses are measured before integer quantization, relative to the backend's
+    already masked distribution and then its truncated distribution.
+    """
+    if isinstance(distribution, RawNextTokenDistribution):
+        if backend is None:
+            raise ValueError("backend is required for raw distributions")
+        prefilter = _select_from_raw_distribution(distribution, config, backend=backend)
+        selected_ids = {entry.token_id for entry in prefilter.entries}
+        token_ids = np.asarray(distribution.token_ids)
+        logits = np.asarray(distribution.logits, dtype=np.float64)
+        mask = np.isin(token_ids, list(selected_ids))
+        retained_mass = float(np.exp(logits[mask] - _logsumexp(logits)).sum())
+    else:
+        prefilter = _select_from_probs(distribution, config)
+        selected_ids = {entry.token_id for entry in prefilter.entries}
+        total = sum(entry.probability for entry in distribution)
+        retained_mass = sum(
+            entry.probability for entry in distribution if entry.token_id in selected_ids
+        ) / total
+    stable = _enforce_retokenization_stability(
+        prefilter, config, backend=backend, prompt=prompt,
+        generated_token_ids=generated_token_ids,
+    )
+    stable_ids = {entry.token_id for entry in stable.entries}
+    removed_mass = sum(
+        entry.probability for entry in prefilter.entries if entry.token_id not in stable_ids
+    )
+    return CandidateAudit(
+        prefilter_selection=prefilter,
+        stable_selection=stable,
+        truncated_tail_mass=max(0.0, min(1.0, 1.0 - retained_mass)),
+        stability_removed_mass=removed_mass,
+    )
+
+
 def select_candidates(
     distribution: list[TokenProb] | RawNextTokenDistribution,
     config: CandidatePolicyConfig,
