@@ -22,10 +22,13 @@ disabled by default; the strict-policy historical results do not include it.
 
 ## Quick start
 
-Install from PyPI with local-LLM support:
+Install this research revision from its branch with local-LLM support.
+The older PyPI release does not include these changes:
 
 ```bash
-pip install ghostext[llm]
+git clone --branch sp2027-revision https://github.com/kzoacn/Ghostext.git
+cd Ghostext
+python -m pip install -e '.[llm]'
 ```
 
 Run a quick encode/decode round-trip check:

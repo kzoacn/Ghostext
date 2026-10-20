@@ -18,10 +18,12 @@ Ghostext 是一个文本隐写 demo。它会先加密消息，再把密文映射
 
 ## 快速开始
 
-先用 PyPI 安装带本地 LLM 支持的版本：
+本研究修订需要从 `sp2027-revision` 分支安装，PyPI 上的旧发布不包含这些改动：
 
 ```bash
-pip install ghostext[llm]
+git clone --branch sp2027-revision https://github.com/kzoacn/Ghostext.git
+cd Ghostext
+python -m pip install -e '.[llm]'
 ```
 
 用一条命令先跑通一次 encode/decode round-trip：
