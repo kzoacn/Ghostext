@@ -34,6 +34,14 @@ framing overhead) from net plaintext bits/token. Both divide by all transmitted
 tokens, including the natural tail. Runtime reports must include unsuccessful
 attempts. Historical unguarded measurements remain historical.
 
+Research callers can request `attempt_callback` from `StegoEncoder.encode`.
+It receives every completed or failed encoding attempt, including elapsed
+time, failure class, packet hash/length, and the generated token prefix.
+This optional telemetry does not change token selection or the wire format.
+It is not emitted to a user or network by default. Experiment collectors must
+keep failed attempts and distinguish total delivery success from first-attempt
+success; retry count is not a feature available to a text-only adversary.
+
 ## 1. 项目目标
 
 Ghostext 是一个基于大模型 next-token 分布的自然语言隐写工程 demo。它的核心目标是：

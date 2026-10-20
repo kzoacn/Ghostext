@@ -27,6 +27,22 @@ RetryNoticeCallback = Callable[[str], None]
 
 
 @dataclass(frozen=True)
+class EncodeAttempt:
+    """Optional research telemetry; never emitted unless the caller requests it."""
+    attempt_index: int
+    success: bool
+    failure_class: str | None
+    failure_message: str | None
+    elapsed_seconds: float
+    packet_sha256: str
+    packet_bytes: int
+    token_ids: tuple[int, ...]
+
+
+AttemptCallback = Callable[[EncodeAttempt], None]
+
+
+@dataclass(frozen=True)
 class SegmentStats:
     name: str
     tokens_used: int
@@ -113,6 +129,7 @@ class StegoEncoder:
         nonce: bytes | None = None,
         progress_callback: ProgressCallback | None = None,
         retry_notice_callback: RetryNoticeCallback | None = None,
+        attempt_callback: AttemptCallback | None = None,
     ) -> EncodeResult:
         start_time = perf_counter()
         plaintext_bytes = plaintext.encode("utf-8")
@@ -126,6 +143,8 @@ class StegoEncoder:
             attempts_allowed = 1
 
         for attempt_index in range(attempts_allowed):
+            attempt_start = perf_counter()
+            attempt_tokens: list[int] = []
             packet = build_packet(
                 plaintext_bytes,
                 passphrase=passphrase,
@@ -140,8 +159,15 @@ class StegoEncoder:
                     prompt=prompt,
                     start_time=start_time,
                     progress_callback=progress_callback,
+                    attempt_tokens=attempt_tokens,
+                )
+                self._extend_with_natural_tail(
+                    packet=packet, prompt=prompt, generated_token_ids=token_ids,
+                    attempt_index=attempt_index,
                 )
             except _LowEntropyWindowTriggered as exc:
+                self._record_attempt(attempt_callback, attempt_index, attempt_start,
+                                     packet, attempt_tokens, exc)
                 if attempt_index + 1 < attempts_allowed:
                     self._emit_retry_notice(
                         attempt_index=attempt_index + 1,
@@ -161,6 +187,8 @@ class StegoEncoder:
                     f"across {attempt_index + 1} attempt(s). {self._retry_hint(can_retry)}"
                 ) from exc
             except UnsafeTokenizationError as exc:
+                self._record_attempt(attempt_callback, attempt_index, attempt_start,
+                                     packet, attempt_tokens, exc)
                 if attempt_index + 1 < attempts_allowed:
                     self._emit_retry_notice(
                         attempt_index=attempt_index + 1,
@@ -174,12 +202,12 @@ class StegoEncoder:
                     f"could not find a safe token path across {attempt_index + 1} "
                     f"attempt(s). {self._retry_hint(can_retry)}"
                 ) from exc
-            self._extend_with_natural_tail(
-                packet=packet,
-                prompt=prompt,
-                generated_token_ids=token_ids,
-                attempt_index=attempt_index,
-            )
+            except Exception as exc:
+                self._record_attempt(attempt_callback, attempt_index, attempt_start,
+                                     packet, attempt_tokens, exc)
+                raise
+            self._record_attempt(attempt_callback, attempt_index, attempt_start,
+                                 packet, token_ids, None)
 
             return EncodeResult(
                 text=self.backend.render(token_ids),
@@ -193,6 +221,17 @@ class StegoEncoder:
 
         raise AssertionError("encoding attempts loop exited unexpectedly")
 
+    def _record_attempt(self, callback, index, start, packet, token_ids, error):
+        if callback is not None:
+            callback(EncodeAttempt(
+                attempt_index=index + 1, success=error is None,
+                failure_class=type(error).__name__ if error is not None else None,
+                failure_message=str(error) if error is not None else None,
+                elapsed_seconds=perf_counter() - start,
+                packet_sha256=sha256(packet).hexdigest(), packet_bytes=len(packet),
+                token_ids=tuple(token_ids),
+            ))
+
     def _encode_packet(
         self,
         *,
@@ -200,8 +239,9 @@ class StegoEncoder:
         prompt: str,
         start_time: float,
         progress_callback: ProgressCallback | None,
+        attempt_tokens: list[int] | None = None,
     ) -> tuple[list[int], list[SegmentStats]]:
-        token_ids: list[int] = []
+        token_ids: list[int] = attempt_tokens if attempt_tokens is not None else []
         stats: list[SegmentStats] = []
         total_bits = len(packet) * 8
         completed_bits = 0.0
