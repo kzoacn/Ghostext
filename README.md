@@ -11,6 +11,9 @@ bias in the historical codec. Both endpoints must use the same revision and
 `--guard-bits` setting (default 128). `--guard-bits 0` selects the historical
 codec for controlled comparisons. This change does not establish resistance
 to text detectors, length analysis, or observation of retry behavior.
+Authentication covers the decoded packet. Visible edits that change only
+discarded guard bits or trailing text can leave the plaintext unchanged and
+still authenticate.
 
 An experimental `--empty-candidate-search 4096` option searches a larger
 rank-ordered pool only when the original pool has no stable token. Both

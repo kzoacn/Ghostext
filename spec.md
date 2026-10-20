@@ -29,6 +29,14 @@ exact conditional TV of the codec against f/F under a uniform interval source.
 Ciphertext uniformity is an assumption for this diagnostic, not a consequence
 of authentication alone.
 
+Authentication covers the reconstructed packet, not the visible token sequence.
+Different guarded token paths can resolve to the same payload prefix while
+differing only in discarded guard bits. Consequently, some edits to
+packet-bearing tokens, as well as edits to the ignored natural tail, can leave
+authentication and plaintext unchanged. The decoder does not promise detection
+of every visible-text edit. A change to authenticated packet data is checked by
+the packet's authentication tags.
+
 Metrics distinguish gross packet bits/token (includes the fixed 88-byte
 framing overhead) from net plaintext bits/token. Both divide by all transmitted
 tokens, including the natural tail. Runtime reports must include unsuccessful

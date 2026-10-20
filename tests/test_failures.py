@@ -98,21 +98,6 @@ class FailureTests(unittest.TestCase):
                 prompt="Write an English paragraph instead.",
             )
 
-    def test_mutated_text_fails(self) -> None:
-        packet_text = self.encoded.text[: self.encoded.packet_tokens]
-        mutated_packet_text = packet_text[:-1] + (
-            "。"
-            if packet_text[-1] != "。"
-            else "，"
-        )
-        mutated = mutated_packet_text + self.encoded.text[self.encoded.packet_tokens :]
-        with self.assertRaises(GhostextError):
-            StegoDecoder(self.backend, self.config).decode(
-                mutated,
-                passphrase=self.passphrase,
-                prompt=self.prompt,
-            )
-
     def test_decoder_ignores_trailing_tail_tokens(self) -> None:
         decoded = StegoDecoder(self.backend, self.config).decode(
             self.encoded.text + "。",
